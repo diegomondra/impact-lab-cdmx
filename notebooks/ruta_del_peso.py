@@ -1661,17 +1661,17 @@ def _(emblemas_search, fmt_mxn, mo, named_programs_df, pl):
 def _(mo):
     agent_input = mo.ui.text_area(
         placeholder=(
-            "Pregúntame sobre los datos abiertos de CDMX…\n\n"
-            "Ej: ¿Cuál es la afluencia del Metro Línea 1 en 2024? · "
-            "¿Cuántas carpetas por robo en Iztapalapa en enero? · "
-            "Busca 'calidad del aire' · "
+            "Pregúntame sobre el presupuesto de CDMX…\n\n"
+            "Ej: ¿A dónde va el presupuesto 2024? · "
+            "¿Cuánto cuesta Cablebús? · "
+            "Top 5 programas en Apoyos sociales · "
             "Proveedores con 'construcción' en el nombre."
         ),
         full_width=True,
         rows=3,
     )
-    agent_submit = mo.ui.button(label="🤖 Preguntar", kind="success")
-    agent_reset = mo.ui.button(label="🗑️ Limpiar", kind="neutral")
+    agent_submit = mo.ui.run_button(label="🤖 Preguntar", kind="success")
+    agent_reset = mo.ui.run_button(label="🗑️ Limpiar", kind="neutral")
     return agent_input, agent_reset, agent_submit
 
 
@@ -1679,11 +1679,9 @@ def _(mo):
 def _(mo):
     get_agent_history, set_agent_history = mo.state([])
     get_agent_error, set_agent_error = mo.state(None)
-    get_submit_seen, set_submit_seen = mo.state(0)
-    get_reset_seen, set_reset_seen = mo.state(0)
     return (
-        get_agent_error, get_agent_history, get_reset_seen, get_submit_seen,
-        set_agent_error, set_agent_history, set_reset_seen, set_submit_seen,
+        get_agent_error, get_agent_history,
+        set_agent_error, set_agent_history,
     )
 
 
@@ -1692,8 +1690,8 @@ def _(
     agent_input, agent_reset, agent_submit,
     budget_tree_df, crosswalk_df, egresos_all, ingresos_raw,
     named_programs_df, pl, rally_raw,
-    get_agent_history, get_reset_seen, get_submit_seen,
-    set_agent_error, set_agent_history, set_reset_seen, set_submit_seen,
+    get_agent_history,
+    set_agent_error, set_agent_history,
 ):
     # Side-effect cell: runs the agent loop when submit is clicked.
     # Exposes 7 dashboard-backed tools (covering tabs I–VII) plus 10
@@ -1718,14 +1716,13 @@ def _(
             if _k and _k not in _os.environ:
                 _os.environ[_k] = _v
 
-    if (agent_reset.value or 0) > get_reset_seen():
-        set_reset_seen(agent_reset.value or 0)
+    # mo.ui.run_button.value is True ONLY on the single render after click,
+    # then False. So "if agent_reset.value" fires exactly once per click.
+    if agent_reset.value:
         set_agent_history([])
         set_agent_error(None)
 
-    _count = agent_submit.value or 0
-    if _count > get_submit_seen() and (agent_input.value or "").strip():
-        set_submit_seen(_count)
+    if agent_submit.value and (agent_input.value or "").strip():
         _question = agent_input.value.strip()
         _api_key = _os.environ.get("ANTHROPIC_API_KEY")
 

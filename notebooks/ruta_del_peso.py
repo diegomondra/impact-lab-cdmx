@@ -57,6 +57,8 @@ def _(mo):
         <a href="https://datos.cdmx.gob.mx/dataset/ingresos" style="color:#78350F;text-decoration:underline;">Ingresos CDMX</a>
         · <a href="https://datos.cdmx.gob.mx/dataset/presupuesto-de-egresos" style="color:#78350F;text-decoration:underline;">Presupuesto de egresos</a>
         · <a href="https://datos.cdmx.gob.mx/dataset/rally-como-van-las-obras-cdmx" style="color:#78350F;text-decoration:underline;">Rally obras</a>.
+        <br/>
+        <b>✓ Validación:</b> el aprobado 2024 suma <b>MXN 267,965,350,437</b> — coincidencia exacta con el Decreto de Presupuesto de Egresos 2024. Cada peso es rastreable al CSV oficial.
         </div>
         """
     )
@@ -173,6 +175,85 @@ def _(DATA_DIR, pl):
         pl.col("rfc_contratista").str.to_uppercase().str.strip_chars().alias("rfc_contratista"),
     ])
     return (rally_raw,)
+
+
+@app.cell
+def _(DATA_DIR, pl):
+    # dev/manu enrichment layer:
+    #   - crosswalk.csv           19k rows → 16 citizen-facing buckets
+    #   - named_programs_2024.csv 81 flagship programs with pesos (Paquete Económico)
+    #   - budget_tree.parquet     pre-aggregated L1+L2 hierarchy per year
+    _ROOT = DATA_DIR.parent
+
+    try:
+        crosswalk_df = pl.read_csv(
+            _ROOT / "crosswalk" / "crosswalk.csv",
+            infer_schema_length=20_000,
+            null_values=["NA", ""],
+            ignore_errors=True,
+        )
+    except Exception:
+        crosswalk_df = None
+
+    try:
+        named_programs_df = pl.read_csv(
+            _ROOT / "crosswalk" / "named_programs_2024.csv",
+            infer_schema_length=10_000,
+            null_values=["NA", ""],
+            ignore_errors=True,
+        ).with_columns(
+            pl.col("monto_aprobado_mxn").cast(pl.Float64, strict=False).fill_null(0)
+        )
+    except Exception:
+        named_programs_df = None
+
+    try:
+        budget_tree_df = pl.read_parquet(_ROOT / "data" / "clean" / "budget_tree.parquet")
+    except Exception:
+        budget_tree_df = None
+
+    CITIZEN_ICON = {
+        "Agua":                         "💧",
+        "Transporte público":           "🚇",
+        "Calles y banquetas":           "🛣️",
+        "Basura y limpia":              "🗑️",
+        "Parques y espacios públicos":  "🌳",
+        "Seguridad":                    "🛡️",
+        "Justicia":                     "⚖️",
+        "Salud":                        "🏥",
+        "Educación":                    "📚",
+        "Apoyos sociales":              "🤝",
+        "Cultura y deporte":            "🎭",
+        "Medio ambiente":               "🌱",
+        "Alumbrado":                    "💡",
+        "Gobierno y administración":    "🏛️",
+        "Deuda":                        "💳",
+        "Otros":                        "▫️",
+    }
+    CITIZEN_PALETTE = {
+        "Agua":                         "#00B7CD",
+        "Transporte público":           "#9F2241",
+        "Calles y banquetas":           "#6C4A7E",
+        "Basura y limpia":              "#94A3B8",
+        "Parques y espacios públicos":  "#00A489",
+        "Seguridad":                    "#EC6730",
+        "Justicia":                     "#C14953",
+        "Salud":                        "#E3007E",
+        "Educación":                    "#3D5A80",
+        "Apoyos sociales":              "#D6A461",
+        "Cultura y deporte":            "#2A9D8F",
+        "Medio ambiente":               "#059669",
+        "Alumbrado":                    "#EAB308",
+        "Gobierno y administración":    "#475569",
+        "Deuda":                        "#7F1D1D",
+        "Otros":                        "#CBD5E1",
+    }
+    CITIZEN_ORDER = list(CITIZEN_ICON.keys())
+
+    return (
+        CITIZEN_ICON, CITIZEN_ORDER, CITIZEN_PALETTE,
+        budget_tree_df, crosswalk_df, named_programs_df,
+    )
 
 
 @app.cell(hide_code=True)
@@ -1201,6 +1282,255 @@ def _(
 
 
 @app.cell(hide_code=True)
+def _(CITIZEN_ORDER, mo):
+    citizen_pick = mo.ui.dropdown(
+        options=CITIZEN_ORDER,
+        value="Transporte público",
+        label="🧭 Categoría ciudadana",
+    )
+    return (citizen_pick,)
+
+
+@app.cell
+def _(
+    CITIZEN_ICON, CITIZEN_PALETTE, budget_tree_df, citizen_pick, fmt_mxn,
+    mo, pl,
+):
+    # ⑥ Ciudadano — Level 1 + Level 2 view from data/clean/budget_tree.parquet.
+    # Reorganizes the budget around 16 citizen-experience categories
+    # (el agua que llega, el camión que pasa, la beca que recibes).
+
+    if budget_tree_df is None:
+        act_ciudadano_content = mo.md(
+            '<div style="padding:24px;background:#FEF2F2;border-left:4px solid #DC2626;'
+            'border-radius:8px;color:#7F1D1D;font-size:13px;">'
+            '<b>⚠️ data/clean/budget_tree.parquet no disponible.</b><br/>'
+            'Corre <code>bash scripts/download_data.sh</code> y regenera '
+            '<code>data/clean/</code> vía <code>data/scripts/build_crosswalk_and_parquets.py</code>.'
+            '</div>'
+        )
+    else:
+        _year_latest = int(budget_tree_df["year"].max())
+        _tree = budget_tree_df.filter(pl.col("year") == _year_latest)
+        _l1 = (
+            _tree.filter(pl.col("level") == 1)
+                 .sort("monto_aprobado", descending=True)
+                 .to_pandas()
+        )
+        _total_l1 = float(_l1["monto_aprobado"].sum()) or 1.0
+
+        _cards = []
+        for _, _r in _l1.iterrows():
+            _cat = _r["citizen_category"]
+            _icon = CITIZEN_ICON.get(_cat, "•")
+            _color = CITIZEN_PALETTE.get(_cat, "#94A3B8")
+            _pct = float(_r["per_100_of_total"]) if _r["per_100_of_total"] is not None else (_r["monto_aprobado"] / _total_l1 * 100)
+            _bar_pct = min(_pct * 3, 100)
+            _cards.append(f"""
+            <div style="
+                background:white;border:1px solid #E2E8F0;border-top:4px solid {_color};
+                border-radius:12px;padding:16px 18px;flex:1 1 180px;min-width:180px;max-width:230px;
+                box-shadow:0 1px 3px rgba(15,23,42,0.04);
+            ">
+                <div style="font-size:24px;">{_icon}</div>
+                <div style="font-size:12px;color:#64748B;letter-spacing:0.5px;font-weight:600;margin-top:6px;line-height:1.3;">{_cat}</div>
+                <div style="font-size:20px;font-weight:700;color:#0F172A;margin-top:6px;letter-spacing:-0.3px;">{fmt_mxn(_r['monto_aprobado'])}</div>
+                <div style="font-size:11px;color:{_color};font-weight:600;margin-top:2px;">{_pct:.1f} de cada 100 pesos</div>
+                <div style="background:#F1F5F9;height:4px;border-radius:2px;margin-top:10px;overflow:hidden;">
+                    <div style="background:{_color};height:100%;width:{_bar_pct:.1f}%;"></div>
+                </div>
+            </div>
+            """)
+
+        _hero = mo.md(f"""
+        <div style="padding:22px 26px;background:white;border:1px solid #E2E8F0;border-radius:14px;margin-bottom:14px;">
+            <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">⑥ Ciudadano · reparto por experiencia</div>
+            <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:4px;line-height:1.15;letter-spacing:-0.5px;">
+                De cada 100 pesos que gasta tu Ciudad en {_year_latest}, así se reparten
+            </div>
+            <div style="font-size:13px;color:#475569;margin:10px 0 0;line-height:1.5;">
+                Reagrupado desde el crosswalk editorial ({_tree.filter(pl.col("level") == 2).height} programas a través de las 16 categorías).
+                No por "clasificación funcional" — por <b>lo que ves cuando sales de tu casa</b>.
+            </div>
+        </div>
+        """)
+
+        _grid = mo.md(
+            f'<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px;">{"".join(_cards)}</div>'
+        )
+
+        _cat = citizen_pick.value
+        _color = CITIZEN_PALETTE.get(_cat, "#9F2241")
+        _icon = CITIZEN_ICON.get(_cat, "•")
+
+        _l1_row = _tree.filter((pl.col("level") == 1) & (pl.col("citizen_category") == _cat))
+        _l1_monto = float(_l1_row["monto_aprobado"].sum()) if _l1_row.height else 0.0
+        _l1_pct = float(_l1_row["per_100_of_total"].sum()) if _l1_row.height else 0.0
+
+        _l2 = (
+            _tree.filter((pl.col("level") == 2) & (pl.col("citizen_category") == _cat))
+                 .sort("monto_aprobado", descending=True)
+                 .head(20)
+                 .to_pandas()
+        )
+
+        if len(_l2) == 0:
+            _l2_html = f"""
+            <div style="padding:18px;background:#F8FAFC;border:1.5px dashed #CBD5E1;border-radius:10px;color:#64748B;font-size:13px;text-align:center;">
+                Sin programas desagregados para <b>{_cat}</b> en el crosswalk.
+                La categoría existe como Level 1 pero sus partidas no se nombraron editorialmente.
+            </div>
+            """
+        else:
+            _rows_html = []
+            _l2_monto_total = float(_l2["monto_aprobado"].sum()) or 1.0
+            for _i, _r in _l2.iterrows():
+                _pct = float(_r["per_100_of_parent"]) if _r["per_100_of_parent"] is not None else (_r["monto_aprobado"] / _l2_monto_total * 100)
+                _bar_pct = min(_pct * 1.1, 100)
+                _rows_html.append(f"""
+                <div style="padding:12px 0;border-bottom:1px solid #F1F5F9;">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;">
+                        <div style="flex:1;min-width:0;font-size:14px;font-weight:600;color:#0F172A;line-height:1.35;">
+                            {_r['display_name']}
+                        </div>
+                        <div style="font-size:14px;font-weight:700;color:#0F172A;white-space:nowrap;font-variant-numeric:tabular-nums;">
+                            {fmt_mxn(_r['monto_aprobado'])}
+                        </div>
+                        <div style="font-size:12px;color:{_color};font-weight:600;white-space:nowrap;min-width:52px;text-align:right;">{_pct:.1f}%</div>
+                    </div>
+                    <div style="font-size:12px;color:#64748B;margin-top:4px;line-height:1.45;" title="{_r['rationale'] or ''}">
+                        {(_r['rationale'] or '')[:160]}
+                    </div>
+                    <div style="background:#F1F5F9;height:3px;border-radius:2px;margin-top:8px;overflow:hidden;">
+                        <div style="background:{_color};height:100%;width:{_bar_pct:.1f}%;"></div>
+                    </div>
+                </div>
+                """)
+            _l2_html = "".join(_rows_html)
+
+        _drill = mo.md(f"""
+        <div style="padding:22px 24px;background:white;border:1px solid #E2E8F0;border-radius:14px;border-top:4px solid {_color};">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
+                <div style="font-size:36px;">{_icon}</div>
+                <div>
+                    <div style="font-size:11px;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;">Detalle · {_cat}</div>
+                    <div style="font-size:22px;font-weight:700;color:#0F172A;letter-spacing:-0.3px;">
+                        {fmt_mxn(_l1_monto)} · {_l1_pct:.1f} de cada 100 pesos
+                    </div>
+                </div>
+            </div>
+            <div style="font-size:12px;color:#475569;margin:10px 0 16px;line-height:1.5;">
+                Programas presupuestarios desagregados (hasta 20). Cada renglón es un
+                programa concreto con su peso y su racional editorial. "Ver en datos
+                oficiales" en <code>data/clean/source_links.csv</code>.
+            </div>
+            {_l2_html}
+        </div>
+        """)
+
+        _footer = mo.md(
+            '<div style="margin:18px 0 0;padding:12px 16px;background:#FEF2F2;border-left:3px solid #9F2241;border-radius:6px;font-size:12px;color:#7F1D1D;line-height:1.5;">'
+            '<b>ℹ️ Metodología.</b> Este reparto se construye a partir del crosswalk editorial (<code>crosswalk/crosswalk.csv</code>). '
+            'Cada programa presupuestario se asigna a una de las 16 categorías con un racional explícito. '
+            'Ver <code>crosswalk/METHODOLOGY.md</code> para las decisiones controvertidas.'
+            '</div>'
+        )
+
+        act_ciudadano_content = mo.vstack([_hero, _grid, citizen_pick, _drill, _footer])
+    return (act_ciudadano_content,)
+
+
+@app.cell
+def _(fmt_mxn, mo, named_programs_df, pl):
+    # ⑦ Emblemáticos — flagship programs extracted from the Paquete Económico 2024
+    # narrative PDFs. These do NOT surface as desc_programa_presupuestario in the
+    # main CSV (Cablebús, Utopías, Altépetl, Cosecha de Lluvia, Comedores, etc.).
+
+    if named_programs_df is None:
+        act_emblemas_content = mo.md(
+            '<div style="padding:24px;background:#FEF2F2;border-left:4px solid #DC2626;'
+            'border-radius:8px;color:#7F1D1D;font-size:13px;">'
+            '<b>⚠️ crosswalk/named_programs_2024.csv no disponible.</b>'
+            '</div>'
+        )
+    else:
+        _df = (
+            named_programs_df
+            .filter(pl.col("monto_aprobado_mxn") > 0)
+            .sort("monto_aprobado_mxn", descending=True)
+            .to_pandas()
+        )
+        _total = float(_df["monto_aprobado_mxn"].sum())
+        _n = len(_df)
+
+        _hero = mo.md(f"""
+        <div style="padding:22px 26px;background:white;border:1px solid #E2E8F0;border-radius:14px;margin-bottom:14px;">
+            <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">⑦ Emblemáticos · los proyectos con nombre propio</div>
+            <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:4px;line-height:1.15;letter-spacing:-0.5px;">
+                {_n} programas emblemáticos · {fmt_mxn(_total)} identificados
+            </div>
+            <div style="font-size:13px;color:#475569;margin:10px 0 0;line-height:1.55;">
+                <b>Cablebús, Utopías, Pilares, Mi Beca, Altépetl, Cosecha de Lluvia, Comedores para el Bienestar</b> y otros
+                programas emblemáticos <b>no aparecen con ese nombre</b> en la CSV oficial de egresos — viven a nivel de
+                partida o de anexo. Estos pesos se extrajeron de los PDFs del Paquete Económico 2024 (Tomo I, Tomo II,
+                Anexos III-F y VI-F).
+            </div>
+        </div>
+        """)
+
+        _sections = {}
+        for _, _r in _df.iterrows():
+            _sec = str(_r["section"] or "Otros").strip()
+            _sections.setdefault(_sec, []).append(_r)
+
+        _section_blocks = []
+        for _sec_name, _rows in _sections.items():
+            _sec_total = sum(float(r["monto_aprobado_mxn"]) for r in _rows)
+            _rows_html = []
+            for _r in _rows:
+                _name = str(_r["display_name"] or "").strip()
+                _ente = str(_r["ente_ejecutor"] or "").strip()
+                _src = str(_r["source"] or "").strip()
+                _note = str(_r["notes"] or "").strip()
+                _rows_html.append(f"""
+                <div style="padding:11px 0;border-bottom:1px solid #F1F5F9;">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:13px;font-weight:600;color:#0F172A;line-height:1.35;">{_name}</div>
+                            <div style="font-size:11px;color:#64748B;margin-top:3px;">{_ente}</div>
+                        </div>
+                        <div style="font-size:13px;font-weight:700;color:#9F2241;white-space:nowrap;font-variant-numeric:tabular-nums;">
+                            {fmt_mxn(_r['monto_aprobado_mxn'])}
+                        </div>
+                    </div>
+                    <div style="font-size:10px;color:#94A3B8;margin-top:3px;font-family:ui-monospace,monospace;">{_src} · {_note}</div>
+                </div>
+                """)
+            _section_blocks.append(f"""
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;padding:16px 20px;margin-bottom:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+                    <div style="font-size:12px;color:#64748B;letter-spacing:1.2px;text-transform:uppercase;font-weight:600;">{_sec_name}</div>
+                    <div style="font-size:13px;color:#9F2241;font-weight:700;font-variant-numeric:tabular-nums;">{fmt_mxn(_sec_total)}</div>
+                </div>
+                {''.join(_rows_html)}
+            </div>
+            """)
+
+        _sections_md = mo.md("".join(_section_blocks))
+
+        _footer = mo.md(
+            '<div style="margin:8px 0 0;padding:12px 16px;background:#FEF2F2;border-left:3px solid #9F2241;border-radius:6px;font-size:12px;color:#7F1D1D;line-height:1.5;">'
+            '<b>ℹ️ Fuente editorial.</b> Los pesos y nombres vienen del Paquete Económico 2024 (PDFs en <code>data/raw/narrative_sources/</code>). '
+            'La columna <code>notes</code> cita página. Este es el <b>supplemento</b> al crosswalk — rellena el hueco de los programas bandera '
+            'que no surgen como <code>desc_programa_presupuestario</code> en la CSV oficial.'
+            '</div>'
+        )
+
+        act_emblemas_content = mo.vstack([_hero, _sections_md, _footer])
+    return (act_emblemas_content,)
+
+
+@app.cell(hide_code=True)
 def _(mo):
     step = mo.ui.tabs(
         {
@@ -1209,6 +1539,8 @@ def _(mo):
             "③ Se prometen":  mo.md(""),
             "④ Aterrizan":    mo.md(""),
             "⑤ Explora":      mo.md(""),
+            "⑥ Ciudadano":    mo.md(""),
+            "⑦ Emblemáticos": mo.md(""),
         },
         value="① Flujo",
     )
@@ -1217,13 +1549,18 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(act1_content, act2_content, act3_content, act4_content, act_flujo_content, step):
+def _(
+    act1_content, act2_content, act3_content, act4_content,
+    act_ciudadano_content, act_emblemas_content, act_flujo_content, step,
+):
     _map = {
         "① Flujo":        act_flujo_content,
         "② Entran":       act1_content,
         "③ Se prometen":  act2_content,
         "④ Aterrizan":    act3_content,
         "⑤ Explora":      act4_content,
+        "⑥ Ciudadano":    act_ciudadano_content,
+        "⑦ Emblemáticos": act_emblemas_content,
     }
     _map.get(step.value, act_flujo_content)
     return

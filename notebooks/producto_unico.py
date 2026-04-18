@@ -3,7 +3,7 @@ import marimo
 __generated_with = "0.23.1"
 app = marimo.App(
     width="full",
-    app_title="Impact Lab CDMX · Producto Unico",
+    app_title="Impact Lab CDMX · Gasto Publico",
 )
 
 
@@ -17,115 +17,141 @@ def _(mo):
             --font-display: 'Sora', 'IBM Plex Sans', sans-serif;
             --font-body: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
             --text-strong: #0f172a;
-            --text-muted: #57657a;
-            --surface-card: linear-gradient(170deg, #ffffff 0%, #f8fbff 100%);
-            --surface-soft: #f8fafc;
-            --border-soft: #dbe7f3;
-            --radius-lg: 14px;
-            --radius-xl: 20px;
-            --shadow-card: 0 10px 22px rgba(15, 23, 42, 0.08);
-            --shadow-hero: 0 24px 56px rgba(13, 23, 39, 0.34);
-            --brand-budget: #2f6690;
-            --brand-obra: #9f2241;
-            --brand-accent: #f4a259;
+            --text-muted: #64748b;
+            --surface: #f6f8fb;
+            --surface-card: #ffffff;
+            --border-soft: #d9e2ec;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            --shadow-card: 0 10px 24px rgba(15, 23, 42, 0.06);
+            --shadow-hero: 0 20px 48px rgba(15, 23, 42, 0.12);
+            --budget: #2f6690;
+            --works: #9f2241;
+            --accent: #d97706;
+        }
+        body {
+            background: linear-gradient(180deg, #f8fafc 0%, #f2f6fb 100%);
         }
         .hero {
             font-family: var(--font-display);
-            padding: 40px 44px 34px;
+            padding: 36px 40px 30px;
             background:
-                radial-gradient(1200px 260px at 10% -10%, rgba(244, 162, 89, 0.25), transparent 60%),
-                radial-gradient(1000px 220px at 90% -20%, rgba(58, 124, 165, 0.26), transparent 60%),
-                linear-gradient(125deg, #132337 0%, #1d3350 45%, #40223d 100%);
-            color: #f8fafc;
+                radial-gradient(1200px 280px at 100% -20%, rgba(47, 102, 144, 0.14), transparent 55%),
+                linear-gradient(135deg, #ffffff 0%, #eef4fb 100%);
+            color: var(--text-strong);
             border-radius: var(--radius-xl);
-            border: 1px solid rgba(255, 255, 255, 0.14);
+            border: 1px solid var(--border-soft);
             box-shadow: var(--shadow-hero);
             margin-bottom: 12px;
-            position: relative;
-            overflow: hidden;
-        }
-        .hero:after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background-image: linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px);
-            background-size: 28px 28px;
-            opacity: 0.2;
-            pointer-events: none;
-        }
-        .hero * {
-            position: relative;
-            z-index: 1;
         }
         .note {
             margin: 10px 0 20px;
             padding: 14px 18px;
-            background: linear-gradient(120deg, #fff9e8 0%, #fff3d5 100%);
+            background: #fff7e8;
             border: 1px solid #f3d58c;
-            border-left: 5px solid #d97706;
+            border-left: 5px solid var(--accent);
             border-radius: 12px;
             color: #7c3b07;
             font-family: var(--font-body);
             font-size: 13px;
-            line-height: 1.55;
-            box-shadow: 0 8px 18px rgba(217, 119, 6, 0.08);
+            line-height: 1.6;
         }
         .card {
             background: var(--surface-card);
             border: 1px solid var(--border-soft);
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-card);
-            padding: 14px 16px;
-            transition: transform 200ms ease, box-shadow 200ms ease;
+            padding: 16px 18px;
         }
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+        .kpi-grid {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin: 14px 0 22px;
+        }
+        .kpi {
+            flex: 1;
+            min-width: 210px;
+            background: var(--surface-card);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-lg);
+            padding: 18px 20px;
+            box-shadow: var(--shadow-card);
+        }
+        .kpi-label {
+            font-family: var(--font-body);
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .kpi-value {
+            font-family: var(--font-display);
+            font-size: 30px;
+            font-weight: 800;
+            color: var(--text-strong);
+            margin-top: 8px;
+            letter-spacing: -0.8px;
+            line-height: 1.05;
         }
         .chip {
             display: inline-block;
-            padding: 4px 8px;
+            padding: 5px 9px;
             border-radius: 999px;
             font-size: 11px;
+            font-family: var(--font-body);
             font-weight: 700;
             letter-spacing: 0.6px;
             text-transform: uppercase;
         }
         .chip-budget {
-            background: rgba(47, 102, 144, 0.15);
-            color: var(--brand-budget);
+            background: rgba(47, 102, 144, 0.12);
+            color: var(--budget);
         }
-        .chip-obra {
+        .chip-works {
             background: rgba(159, 34, 65, 0.12);
-            color: var(--brand-obra);
+            color: var(--works);
         }
-        @media (prefers-reduced-motion: reduce) {
-            .card {
-                transition: none;
-            }
-            .card:hover {
-                transform: none;
-                box-shadow: var(--shadow-card);
-            }
+        .story-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+            margin: 14px 0 20px;
+        }
+        .story-title {
+            font-family: var(--font-display);
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-strong);
+            margin-top: 8px;
+        }
+        .story-copy {
+            font-family: var(--font-body);
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.55;
+            margin-top: 6px;
         }
         </style>
 
         <div class="hero">
-            <div style="font-size: 12px; letter-spacing: 2.8px; opacity: 0.88; text-transform: uppercase; font-weight: 700; color:#ffd8a1;">
-                Ciudad de Mexico · Impact Lab · Entregable Unico
+            <div style="font-size:12px;letter-spacing:2.4px;text-transform:uppercase;font-weight:700;color:#486581;">
+                Ciudad de Mexico · Impact Lab · Producto unico
             </div>
-            <div style="font-size: 40px; font-weight: 800; margin-top: 8px; letter-spacing: -0.9px; line-height:1.12; max-width: 920px;">
-                Del presupuesto en papel a la obra en territorio
+            <div style="font-size:38px;font-weight:800;line-height:1.08;letter-spacing:-0.9px;margin-top:8px;max-width:900px;">
+                Gasto publico de la CDMX, explicado sin forzar una sola base de datos
             </div>
-            <div style="font-family:'IBM Plex Sans', sans-serif; font-size: 15px; margin-top: 12px; max-width: 860px; line-height: 1.65; color:#deecff;">
-                Un solo producto para contar la historia completa: priorizacion presupuestal, ejecucion institucional
-                y evidencia georreferenciada de proyectos federales en la CDMX.
+            <div style="font-family:var(--font-body);font-size:15px;line-height:1.65;max-width:860px;color:#334155;margin-top:12px;">
+                Esta app organiza dos vistas oficiales y complementarias dentro del mismo producto:
+                una para leer el presupuesto y otra para inspeccionar obra publica georreferenciada.
             </div>
         </div>
 
         <div class="note">
-            <b>Comparabilidad temporal:</b> el eje principal usa cortes 2018-2019 para conectar presupuesto y obra.
-            Se mantiene referencia 2023-2024 para contexto reciente.
+            <b>Como leer este producto.</b> Aqui no se mezclan artificialmente dos datasets distintos.
+            La vista de <b>Presupuesto</b> responde como se asigna y se ejerce el gasto; la vista de
+            <b>Obra publica</b> responde donde estan los proyectos y cuanto avanzaron.
         </div>
         """
     )
@@ -143,17 +169,6 @@ def _():
 
     DATA_DIR = Path(__file__).parent.parent / "data"
     FONT = "Sora, IBM Plex Sans, -apple-system, system-ui, sans-serif"
-
-    PALETTE = [
-        "#23395B",
-        "#2F6690",
-        "#3A7CA5",
-        "#00A7A0",
-        "#F4A259",
-        "#C94C4C",
-        "#6D597A",
-        "#2A9D8F",
-    ]
 
     RAMO_PALETTE = {
         "Aportaciones Federales para Entidades Federativas y Municipios": "#23395B",
@@ -202,26 +217,14 @@ def _():
             ),
             legend=dict(
                 font=dict(family=FONT, size=11, color="#334155"),
-                bgcolor="rgba(255,255,255,0.74)",
+                bgcolor="rgba(255,255,255,0.82)",
                 bordercolor="#dbe7f3",
                 borderwidth=1,
             ),
         )
         return fig
 
-    return (
-        DATA_DIR,
-        FONT,
-        PALETTE,
-        RAMO_PALETTE,
-        fmt_int,
-        fmt_mxn,
-        go,
-        mo,
-        pl,
-        px,
-        style_fig,
-    )
+    return DATA_DIR, FONT, RAMO_PALETTE, fmt_int, fmt_mxn, go, mo, pl, px, style_fig
 
 
 @app.cell
@@ -240,14 +243,14 @@ def _(DATA_DIR, pl):
         )
 
     budget_files = {
-        "2018 · aprobado": DATA_DIR / "egresos_2018_aprobado.csv",
         "2018 · cuenta publica": DATA_DIR / "egresos_2018_cp.csv",
-        "2019 · aprobado": DATA_DIR / "egresos_2019_aprobado.csv",
         "2019 Q1 · avance trimestral": DATA_DIR / "egresos_2019_01_trimestre.csv",
         "2019 Q2 · avance trimestral": DATA_DIR / "egresos_2019_02_trimestre.csv",
         "2019 Q3 · avance trimestral": DATA_DIR / "egresos_2019_03_trimestre.csv",
         "2023 Q3 · avance trimestral": DATA_DIR / "egresos_2023_03_trimestre.csv",
-        "2024 · aprobado": DATA_DIR / "egresos_2024_aprobado.csv",
+        "2018 · aprobado (planeacion)": DATA_DIR / "egresos_2018_aprobado.csv",
+        "2019 · aprobado (planeacion)": DATA_DIR / "egresos_2019_aprobado.csv",
+        "2024 · aprobado (planeacion)": DATA_DIR / "egresos_2024_aprobado.csv",
     }
     budget_files = {k: v for k, v in budget_files.items() if v.exists()}
     budget_datasets = {k: load_budget(v) for k, v in budget_files.items()}
@@ -279,27 +282,62 @@ def _(DATA_DIR, pl):
 
 
 @app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        """
+        <div class="story-grid">
+            <div class="card">
+                <span class="chip chip-budget">Vista 1</span>
+                <div class="story-title">Presupuesto</div>
+                <div class="story-copy">
+                    Sirve para entender asignacion, gasto ejercido y concentracion institucional.
+                </div>
+            </div>
+            <div class="card">
+                <span class="chip chip-works">Vista 2</span>
+                <div class="story-title">Obra publica</div>
+                <div class="story-copy">
+                    Sirve para ver proyectos en el territorio, alcaldias, avance fisico y monto ejercido.
+                </div>
+            </div>
+            <div class="card">
+                <span class="chip">Regla de lectura</span>
+                <div class="story-title">No comparar a la fuerza</div>
+                <div class="story-copy">
+                    El producto es unico por experiencia, no porque ambos datasets midan exactamente lo mismo.
+                </div>
+            </div>
+        </div>
+        """
+    )
+    return
+
+
+@app.cell(hide_code=True)
 def _(budget_datasets, mo, raw_obras):
-    year_picker = mo.ui.dropdown(
+    view_selector = mo.ui.dropdown(
+        options=["Presupuesto", "Obra publica"],
+        value="Presupuesto",
+        label="Vista",
+    )
+    budget_picker = mo.ui.dropdown(
         options=list(budget_datasets.keys()),
         value=list(budget_datasets.keys())[0],
         label="Corte presupuestal",
     )
-
     alcaldias = sorted(raw_obras["desc_alcaldia"].drop_nulls().unique().to_list())
     alcaldia_filter = mo.ui.multiselect(
         options=alcaldias,
         value=[],
-        label="Alcaldia (obra)",
+        label="Alcaldia",
     )
-
     ciclos = sorted(raw_obras["ciclo"].drop_nulls().unique().to_list())
     ciclo_filter = mo.ui.range_slider(
         start=min(ciclos),
         stop=max(ciclos),
         value=(min(ciclos), max(ciclos)),
         step=1,
-        label="Anos (obra)",
+        label="Periodo",
         show_value=True,
         full_width=False,
     )
@@ -307,44 +345,53 @@ def _(budget_datasets, mo, raw_obras):
     mo.md(
         """
         <div class="card" style="margin: 8px 0 14px;">
-            <div style="font-family: var(--font-body); font-size:11px; color: var(--text-muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; font-weight:700;">
-                Controles del producto integrado
+            <div style="font-family:var(--font-body);font-size:11px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:8px;">
+                Controles
             </div>
         </div>
         """
     )
-    mo.hstack(
-        [year_picker, alcaldia_filter, ciclo_filter],
-        justify="start",
-        gap=1.2,
-        wrap=True,
-    )
-    return alcaldia_filter, ciclo_filter, year_picker
+    return alcaldia_filter, budget_picker, ciclo_filter, view_selector
+
+
+@app.cell(hide_code=True)
+def _(alcaldia_filter, budget_picker, ciclo_filter, mo, view_selector):
+    if view_selector.value == "Presupuesto":
+        mo.hstack([view_selector, budget_picker], justify="start", gap=1.2, wrap=True)
+    else:
+        mo.hstack(
+            [view_selector, alcaldia_filter, ciclo_filter],
+            justify="start",
+            gap=1.2,
+            wrap=True,
+        )
+    return
 
 
 @app.cell
-def _(budget_datasets, pl, year_picker):
-    budget_df = budget_datasets[year_picker.value]
-
+def _(budget_datasets, budget_picker, pl):
+    budget_df = budget_datasets[budget_picker.value]
     mod_sum = budget_df["monto_modificado"].fill_null(0).sum()
     spent_sum = budget_df["monto_ejercido"].fill_null(0).sum()
+
     if mod_sum > 0:
-        budget_col, budget_label = "monto_modificado", "Modificado"
+        budget_label = "Modificado"
+        budget_base = "monto_modificado"
     else:
-        budget_col, budget_label = "monto_aprobado", "Aprobado"
+        budget_label = "Aprobado"
+        budget_base = "monto_aprobado"
 
     has_spent = spent_sum > 0
-
     budget_df = budget_df.with_columns(
         [
-            pl.col(budget_col).fill_null(0).alias("_budget"),
+            pl.col(budget_base).fill_null(0).alias("_budget"),
             pl.col("monto_ejercido").fill_null(0).alias("_spent"),
         ]
     )
-    budget_df = budget_df.with_columns(
-        pl.max_horizontal([pl.col("_budget"), pl.col("_spent")]).alias("_amount")
-    ).filter(pl.col("_amount") > 0)
-    return budget_col, budget_df, budget_label, has_spent
+    budget_df = budget_df.filter(
+        pl.max_horizontal([pl.col("_budget"), pl.col("_spent")]) > 0
+    )
+    return budget_df, budget_label, has_spent
 
 
 @app.cell
@@ -356,55 +403,77 @@ def _(alcaldia_filter, ciclo_filter, pl, raw_obras):
 
 
 @app.cell(hide_code=True)
-def _(budget_df, budget_label, fmt_int, fmt_mxn, has_spent, mo, obra_df, pl):
+def _(mo, view_selector):
+    if view_selector.value == "Presupuesto":
+        mo.md(
+            """
+            <div class="card" style="margin: 6px 0 12px; font-family:var(--font-body); color:var(--text-muted); line-height:1.6;">
+                <b>Vista activa: Presupuesto.</b> Aqui la pregunta es como se distribuye y se ejerce el gasto.
+                No se intenta inferir obra publica a partir de esta tabla.
+            </div>
+            """
+        )
+    else:
+        mo.md(
+            """
+            <div class="card" style="margin: 6px 0 12px; font-family:var(--font-body); color:var(--text-muted); line-height:1.6;">
+                <b>Vista activa: Obra publica.</b> Aqui la pregunta es donde estan los proyectos,
+                cuanto dinero ejercieron y que avance fisico reportan.
+            </div>
+            """
+        )
+    return
+
+
+@app.cell(hide_code=True)
+def _(budget_df, budget_label, fmt_mxn, has_spent, mo, view_selector):
+    mo.stop(view_selector.value != "Presupuesto")
     budget_total = budget_df["_budget"].sum()
     spent_total = budget_df["_spent"].sum()
     exec_rate = (
         (spent_total / budget_total * 100) if has_spent and budget_total > 0 else None
     )
 
-    obras_total = obra_df.height
-    obras_monto = obra_df["monto_ejercido"].sum()
-    obras_done = obra_df.filter(pl.col("avance_fisico") >= 95).height
-    obras_done_rate = (obras_done / obras_total * 100) if obras_total else 0
-
-    def kpi(label, value, chip):
+    def _kpi(label, value):
         return f"""
-        <div class="card" style="flex:1;min-width:220px;">
-            <div class="chip {chip}">{label}</div>
-            <div style="font-size:30px;font-weight:800;color:var(--text-strong);margin-top:8px;letter-spacing:-0.7px;line-height:1.1;">{value}</div>
+        <div class="kpi">
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-value">{value}</div>
         </div>
         """
 
+    _cards = [
+        _kpi(f"Presupuesto {budget_label.lower()}", fmt_mxn(budget_total)),
+        _kpi("Ejercido", fmt_mxn(spent_total) if has_spent else "No disponible"),
+        _kpi(
+            "Ejecucion",
+            f"{exec_rate:.1f}%" if exec_rate is not None else "No disponible",
+        ),
+        _kpi("Filas con gasto", f"{budget_df.height:,}"),
+    ]
+
     mo.md(
         f"""
-        ## Acto 1 · Panorama integrado
+        ## Presupuesto
 
-        <div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0 22px;">
-            {kpi(f"Presupuesto {budget_label.lower()}", fmt_mxn(budget_total), "chip-budget")}
-            {kpi("Ejecucion presupuestal", f"{exec_rate:.1f}%" if exec_rate is not None else "No disponible", "chip-budget")}
-            {kpi("Proyectos de obra", fmt_int(obras_total), "chip-obra")}
-            {kpi("Inversion en obra", fmt_mxn(obras_monto), "chip-obra")}
-            {kpi("Obras terminadas", f"{obras_done_rate:.1f}%", "chip-obra")}
-        </div>
+        <div class="kpi-grid">{"".join(_cards)}</div>
         """
     )
     return
 
 
 @app.cell(hide_code=True)
-def _(budget_label, has_spent, mo):
-    _copy = (
-        f"Top funciones por presupuesto <b>{budget_label.lower()}</b> y comparacion contra lo ejercido."
+def _(budget_label, has_spent, mo, view_selector):
+    mo.stop(view_selector.value != "Presupuesto")
+    copy = (
+        f"Cada barra muestra el presupuesto <b>{budget_label.lower()}</b> y lo ejercido reportado."
         if has_spent
-        else f"Top funciones por presupuesto <b>{budget_label.lower()}</b>. Este corte no incluye ejercicio reportado."
+        else f"Este corte solo muestra presupuesto <b>{budget_label.lower()}</b>; no incluye ejercicio reportado."
     )
     mo.md(
         f"""
-        ## Acto 2 · Presupuesto
-
-        <div class="card" style="margin: 6px 0 12px; font-family: var(--font-body); font-size: 13px; color: var(--text-muted); line-height: 1.55;">
-            {_copy}
+        <div class="card" style="margin: 8px 0 12px; font-family:var(--font-body); font-size:13px; color:var(--text-muted); line-height:1.6;">
+            {copy}
         </div>
         """
     )
@@ -412,8 +481,10 @@ def _(budget_label, has_spent, mo):
 
 
 @app.cell
-def _(budget_df, fmt_mxn, go, has_spent, pl, style_fig):
-    top = (
+def _(budget_df, fmt_mxn, go, has_spent, mo, pl, style_fig, view_selector):
+    mo.stop(view_selector.value != "Presupuesto")
+
+    top_funciones = (
         budget_df.with_columns(pl.col("desc_funcion").fill_null("Sin clasificar"))
         .group_by("desc_funcion")
         .agg(
@@ -429,52 +500,120 @@ def _(budget_df, fmt_mxn, go, has_spent, pl, style_fig):
         .reset_index(drop=True)
     )
 
-    _fig_budget = go.Figure()
-    _fig_budget.add_trace(
+    fig_budget_functions = go.Figure()
+    fig_budget_functions.add_trace(
         go.Bar(
-            y=top["desc_funcion"],
-            x=top["budget"],
+            y=top_funciones["desc_funcion"],
+            x=top_funciones["budget"],
             orientation="h",
-            marker=dict(color="#E2E8F0"),
+            marker=dict(color="#D9E7F5"),
             name="Presupuesto",
             hovertemplate="<b>%{y}</b><br>Presupuesto: %{customdata}<extra></extra>",
-            customdata=[fmt_mxn(v) for v in top["budget"]],
+            customdata=[fmt_mxn(v) for v in top_funciones["budget"]],
         )
     )
-
     if has_spent:
-        _fig_budget.add_trace(
+        fig_budget_functions.add_trace(
             go.Bar(
-                y=top["desc_funcion"],
-                x=top["spent"],
+                y=top_funciones["desc_funcion"],
+                x=top_funciones["spent"],
                 orientation="h",
-                marker=dict(color="#9F2241"),
+                marker=dict(color="#2F6690"),
                 name="Ejercido",
                 hovertemplate="<b>%{y}</b><br>Ejercido: %{customdata}<extra></extra>",
-                customdata=[fmt_mxn(v) for v in top["spent"]],
+                customdata=[fmt_mxn(v) for v in top_funciones["spent"]],
             )
         )
 
-    _fig_budget.update_layout(
+    fig_budget_functions.update_layout(
         barmode="overlay",
         bargap=0.35,
-        xaxis=dict(showgrid=True, gridcolor="#F1F5F9", tickformat=".2s", title=""),
-        yaxis=dict(title="", tickfont=dict(size=12), automargin=True),
+        xaxis=dict(showgrid=True, gridcolor="#EDF2F7", tickformat=".2s", title=""),
+        yaxis=dict(title="", automargin=True),
         legend=dict(orientation="h", y=1.02, x=0),
     )
-    style_fig(_fig_budget, height=560)
-    _fig_budget
+    style_fig(fig_budget_functions, height=560)
+    fig_budget_functions
+    return
+
+
+@app.cell
+def _(budget_df, fmt_mxn, mo, px, pl, style_fig, view_selector):
+    mo.stop(view_selector.value != "Presupuesto")
+
+    top_dependencias = (
+        budget_df.group_by("desc_unidad_responsable")
+        .agg(pl.col("_budget").sum().alias("budget"))
+        .sort("budget", descending=True)
+        .head(12)
+        .to_pandas()
+    )
+    top_dependencias["label"] = top_dependencias["budget"].apply(fmt_mxn)
+
+    fig_budget_agencies = px.bar(
+        top_dependencias.sort_values("budget"),
+        x="budget",
+        y="desc_unidad_responsable",
+        orientation="h",
+        text="label",
+        color="budget",
+        color_continuous_scale=[[0, "#dbe7f3"], [1, "#2f6690"]],
+    )
+    fig_budget_agencies.update_traces(
+        textposition="outside",
+        hovertemplate="<b>%{y}</b><br>%{text}<extra></extra>",
+        cliponaxis=False,
+    )
+    fig_budget_agencies.update_layout(
+        xaxis=dict(showgrid=True, gridcolor="#EDF2F7", title="", tickformat=".2s"),
+        yaxis=dict(title=""),
+        coloraxis_showscale=False,
+    )
+    style_fig(fig_budget_agencies, height=520)
+    fig_budget_agencies
     return
 
 
 @app.cell(hide_code=True)
-def _(mo):
+def _(fmt_int, fmt_mxn, mo, obra_df, pl, view_selector):
+    mo.stop(view_selector.value != "Obra publica")
+    total_projects = obra_df.height
+    total_investment = obra_df["monto_ejercido"].sum()
+    total_alcaldias = obra_df["desc_alcaldia"].n_unique()
+    completed = obra_df.filter(pl.col("avance_fisico") >= 95).height
+    completion_rate = (completed / total_projects * 100) if total_projects else 0
+
+    def _kpi(label, value):
+        return f"""
+        <div class="kpi">
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-value">{value}</div>
+        </div>
+        """
+
+    cards = [
+        _kpi("Proyectos", fmt_int(total_projects)),
+        _kpi("Inversion ejercida", fmt_mxn(total_investment)),
+        _kpi("Alcaldias con obra", fmt_int(total_alcaldias)),
+        _kpi("Proyectos terminados", f"{completion_rate:.1f}%"),
+    ]
+    mo.md(
+        f"""
+        ## Obra publica
+
+        <div class="kpi-grid">{"".join(cards)}</div>
+        """
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo, view_selector):
+    mo.stop(view_selector.value != "Obra publica")
     mo.md(
         """
-        ## Acto 3 · Territorio
-
-        <div class="card" style="margin: 6px 0 12px; font-family: var(--font-body); font-size: 13px; color: var(--text-muted); line-height: 1.55;">
-            El mapa conecta la evidencia territorial con la historia presupuestal: cada punto es un proyecto federal georreferenciado.
+        <div class="card" style="margin: 8px 0 12px; font-family:var(--font-body); font-size:13px; color:var(--text-muted); line-height:1.6;">
+            Cada punto representa un proyecto federal georreferenciado. Usa los filtros de alcaldia y periodo para reducir el mapa.
         </div>
         """
     )
@@ -482,10 +621,11 @@ def _(mo):
 
 
 @app.cell
-def _(RAMO_PALETTE, FONT, fmt_mxn, mo, obra_df, px):
+def _(FONT, RAMO_PALETTE, fmt_mxn, mo, obra_df, px, view_selector):
+    mo.stop(view_selector.value != "Obra publica")
     import math
 
-    pdf = (
+    obras_pdf = (
         obra_df.select(
             [
                 "latitud",
@@ -501,9 +641,11 @@ def _(RAMO_PALETTE, FONT, fmt_mxn, mo, obra_df, px):
         .copy()
     )
 
-    pdf["desc_ramo"] = pdf["desc_ramo"].fillna("Sin clasificar")
-    pdf["_name"] = pdf["nombre_proyecto"].fillna("(sin nombre)").str.slice(0, 90)
-    pdf["_size"] = pdf["monto_ejercido"].apply(
+    obras_pdf["desc_ramo"] = obras_pdf["desc_ramo"].fillna("Sin clasificar")
+    obras_pdf["_name"] = (
+        obras_pdf["nombre_proyecto"].fillna("(sin nombre)").str.slice(0, 90)
+    )
+    obras_pdf["_size"] = obras_pdf["monto_ejercido"].apply(
         lambda v: max(math.sqrt(max(v, 0)) / 700, 4)
     )
 
@@ -515,27 +657,26 @@ def _(RAMO_PALETTE, FONT, fmt_mxn, mo, obra_df, px):
             f"<span style='color:#9F2241'>{row['desc_ramo']}</span>"
         )
 
-    pdf["_h"] = pdf.apply(hover, axis=1)
-
-    ramos_present = sorted(pdf["desc_ramo"].unique())
+    obras_pdf["_hover"] = obras_pdf.apply(hover, axis=1)
+    ramos_present = sorted(obras_pdf["desc_ramo"].unique())
     color_seq = [RAMO_PALETTE.get(r, "#94A3B8") for r in ramos_present]
 
-    _fig_map = px.scatter_map(
-        pdf,
+    fig_obra_map = px.scatter_map(
+        obras_pdf,
         lat="latitud",
         lon="longitud",
         color="desc_ramo",
         color_discrete_sequence=color_seq,
         size="_size",
         size_max=25,
-        custom_data=["_h"],
+        custom_data=["_hover"],
         zoom=9.7,
         center={"lat": 19.38, "lon": -99.15},
         map_style="carto-positron",
         opacity=0.74,
     )
-    _fig_map.update_traces(hovertemplate="%{customdata[0]}<extra></extra>")
-    _fig_map.update_layout(
+    fig_obra_map.update_traces(hovertemplate="%{customdata[0]}<extra></extra>")
+    fig_obra_map.update_layout(
         height=620,
         margin=dict(l=0, r=0, t=0, b=0),
         legend=dict(
@@ -549,7 +690,6 @@ def _(RAMO_PALETTE, FONT, fmt_mxn, mo, obra_df, px):
             borderwidth=1,
             font=dict(size=11, family=FONT),
             title=dict(text="<b>Ramo federal</b>", font=dict(size=12)),
-            itemsizing="constant",
         ),
         paper_bgcolor="white",
         hoverlabel=dict(
@@ -558,13 +698,15 @@ def _(RAMO_PALETTE, FONT, fmt_mxn, mo, obra_df, px):
             font=dict(family=FONT, size=12, color="#f8fafc"),
         ),
     )
-    mo.ui.plotly(_fig_map)
+    mo.ui.plotly(fig_obra_map)
     return
 
 
 @app.cell
-def _(FONT, fmt_mxn, go, obra_df, pl):
-    alc = (
+def _(FONT, fmt_mxn, go, mo, obra_df, pl, view_selector):
+    mo.stop(view_selector.value != "Obra publica")
+
+    top_alcaldias = (
         obra_df.group_by("desc_alcaldia")
         .agg(
             [
@@ -578,27 +720,29 @@ def _(FONT, fmt_mxn, go, obra_df, pl):
         .iloc[::-1]
         .reset_index(drop=True)
     )
-    alc["desc_alcaldia"] = alc["desc_alcaldia"].fillna("Sin alcaldia")
-    alc["label"] = alc["monto"].apply(fmt_mxn)
+    top_alcaldias["desc_alcaldia"] = top_alcaldias["desc_alcaldia"].fillna(
+        "Sin alcaldia"
+    )
+    top_alcaldias["label"] = top_alcaldias["monto"].apply(fmt_mxn)
 
-    _fig_alcaldia = go.Figure(
+    fig_obra_alcaldias = go.Figure(
         go.Bar(
-            x=alc["monto"],
-            y=alc["desc_alcaldia"],
+            x=top_alcaldias["monto"],
+            y=top_alcaldias["desc_alcaldia"],
             orientation="h",
-            marker=dict(color="#2F6690"),
-            text=alc["label"],
+            marker=dict(color="#9F2241"),
+            text=top_alcaldias["label"],
             textposition="outside",
             textfont=dict(size=11, color="#334155"),
             hovertemplate="<b>%{y}</b><br>%{text} · %{customdata} proyectos<extra></extra>",
-            customdata=alc["proyectos"],
+            customdata=top_alcaldias["proyectos"],
             cliponaxis=False,
         )
     )
-    _fig_alcaldia.update_layout(
+    fig_obra_alcaldias.update_layout(
         height=420,
         margin=dict(l=10, r=60, t=20, b=20),
-        xaxis=dict(showgrid=True, gridcolor="#e8eff7", tickformat=".2s", title=""),
+        xaxis=dict(showgrid=True, gridcolor="#EDF2F7", tickformat=".2s", title=""),
         yaxis=dict(title="", tickfont=dict(size=12)),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
@@ -609,7 +753,7 @@ def _(FONT, fmt_mxn, go, obra_df, pl):
             font=dict(family=FONT, size=12, color="#f8fafc"),
         ),
     )
-    _fig_alcaldia
+    fig_obra_alcaldias
     return
 
 
@@ -621,7 +765,7 @@ def _(mo):
         <div style="text-align:center;color:#64748B;font-size:12px;padding:12px 0 30px;">
         Fuentes: Portal de Datos Abiertos CDMX · Presupuesto de egresos + Rally Como van las obras
         <br>
-        Producto unico construido con Marimo + Plotly · Impact Lab CDMX 2026
+        Producto unico construido como una sola experiencia con dos vistas complementarias.
         </div>
         """
     )

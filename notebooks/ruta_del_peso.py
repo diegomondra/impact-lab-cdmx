@@ -1298,9 +1298,8 @@ def _(
     CITIZEN_ICON, CITIZEN_PALETTE, budget_tree_df, citizen_pick, fmt_mxn,
     mo, pl,
 ):
-    # ⑥ Ciudadano — Level 1 + Level 2 view from data/clean/budget_tree.parquet.
-    # Reorganizes the budget around 16 citizen-experience categories
-    # (el agua que llega, el camión que pasa, la beca que recibes).
+    # ⑥ Ciudadano — Level 1 + Level 2 from data/clean/budget_tree.parquet.
+    # 16 citizen experiences (el agua que llega, el camión que pasa, la beca).
 
     if budget_tree_df is None:
         act_ciudadano_content = mo.md(
@@ -1308,7 +1307,7 @@ def _(
             'border-radius:8px;color:#7F1D1D;font-size:13px;">'
             '<b>⚠️ data/clean/budget_tree.parquet no disponible.</b><br/>'
             'Corre <code>bash scripts/download_data.sh</code> y regenera '
-            '<code>data/clean/</code> vía <code>data/scripts/build_crosswalk_and_parquets.py</code>.'
+            '<code>data/clean/</code>.'
             '</div>'
         )
     else:
@@ -1318,50 +1317,85 @@ def _(
             _tree.filter(pl.col("level") == 1)
                  .sort("monto_aprobado", descending=True)
                  .to_pandas()
+                 .reset_index(drop=True)
         )
         _total_l1 = float(_l1["monto_aprobado"].sum()) or 1.0
+        _n_programs = _tree.filter(pl.col("level") == 2).height
+        _selected = citizen_pick.value
 
         _cards = []
-        for _, _r in _l1.iterrows():
+        for _i, _r in _l1.iterrows():
             _cat = _r["citizen_category"]
             _icon = CITIZEN_ICON.get(_cat, "•")
             _color = CITIZEN_PALETTE.get(_cat, "#94A3B8")
-            _pct = float(_r["per_100_of_total"]) if _r["per_100_of_total"] is not None else (_r["monto_aprobado"] / _total_l1 * 100)
+            _pct = (
+                float(_r["per_100_of_total"])
+                if _r["per_100_of_total"] is not None
+                else (_r["monto_aprobado"] / _total_l1 * 100)
+            )
             _bar_pct = min(_pct * 3, 100)
+            _is_selected = (_cat == _selected)
+            _ring = (
+                f"box-shadow:0 0 0 3px {_color}40, 0 6px 18px rgba(15,23,42,0.10);transform:translateY(-1px);"
+                if _is_selected
+                else "box-shadow:0 1px 3px rgba(15,23,42,0.04);"
+            )
             _cards.append(f"""
             <div style="
                 background:white;border:1px solid #E2E8F0;border-top:4px solid {_color};
-                border-radius:12px;padding:16px 18px;flex:1 1 180px;min-width:180px;max-width:230px;
-                box-shadow:0 1px 3px rgba(15,23,42,0.04);
+                border-radius:14px;padding:18px 18px 16px;
+                flex:1 1 200px;min-width:200px;max-width:240px;
+                {_ring}
+                transition:box-shadow 0.18s ease, transform 0.18s ease;
             ">
-                <div style="font-size:24px;">{_icon}</div>
-                <div style="font-size:12px;color:#64748B;letter-spacing:0.5px;font-weight:600;margin-top:6px;line-height:1.3;">{_cat}</div>
-                <div style="font-size:20px;font-weight:700;color:#0F172A;margin-top:6px;letter-spacing:-0.3px;">{fmt_mxn(_r['monto_aprobado'])}</div>
-                <div style="font-size:11px;color:{_color};font-weight:600;margin-top:2px;">{_pct:.1f} de cada 100 pesos</div>
-                <div style="background:#F1F5F9;height:4px;border-radius:2px;margin-top:10px;overflow:hidden;">
-                    <div style="background:{_color};height:100%;width:{_bar_pct:.1f}%;"></div>
+                <div style="display:flex;align-items:start;justify-content:space-between;gap:10px;">
+                    <div style="font-size:36px;line-height:1;">{_icon}</div>
+                    <div style="font-size:10px;color:#94A3B8;letter-spacing:1.2px;font-weight:700;margin-top:6px;">#{_i+1:02d}</div>
+                </div>
+                <div style="font-size:13px;color:#0F172A;font-weight:600;margin-top:14px;line-height:1.35;min-height:36px;">
+                    {_cat}
+                </div>
+                <div style="font-size:22px;font-weight:700;color:#0F172A;margin-top:8px;letter-spacing:-0.3px;font-variant-numeric:tabular-nums;">
+                    {fmt_mxn(_r['monto_aprobado'])}
+                </div>
+                <div style="font-size:12px;color:{_color};font-weight:700;margin-top:2px;">
+                    {_pct:.1f} de cada 100 pesos
+                </div>
+                <div style="background:#F1F5F9;height:5px;border-radius:3px;margin-top:12px;overflow:hidden;">
+                    <div style="background:linear-gradient(90deg,{_color},{_color}cc);height:100%;width:{_bar_pct:.1f}%;border-radius:3px;"></div>
                 </div>
             </div>
             """)
 
         _hero = mo.md(f"""
-        <div style="padding:22px 26px;background:white;border:1px solid #E2E8F0;border-radius:14px;margin-bottom:14px;">
-            <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">⑥ Ciudadano · reparto por experiencia</div>
-            <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:4px;line-height:1.15;letter-spacing:-0.5px;">
-                De cada 100 pesos que gasta tu Ciudad en {_year_latest}, así se reparten
+        <div style="padding:28px 34px;background:linear-gradient(135deg,#FDEBEE 0%,#FFF 55%,#FFF 100%);
+            border:1px solid #E2E8F0;border-radius:16px;margin-bottom:16px;
+            box-shadow:0 1px 3px rgba(15,23,42,0.03);">
+            <div style="font-size:11px;color:#9F2241;letter-spacing:2px;text-transform:uppercase;font-weight:700;">⑥ Ciudadano · reparto por experiencia</div>
+            <div style="font-size:34px;font-weight:700;color:#0F172A;margin-top:10px;line-height:1.08;letter-spacing:-0.8px;">
+                De cada 100 pesos, así se reparten
             </div>
-            <div style="font-size:13px;color:#475569;margin:10px 0 0;line-height:1.5;">
-                Reagrupado desde el crosswalk editorial ({_tree.filter(pl.col("level") == 2).height} programas a través de las 16 categorías).
-                No por "clasificación funcional" — por <b>lo que ves cuando sales de tu casa</b>.
+            <div style="display:flex;align-items:baseline;gap:16px;margin-top:14px;flex-wrap:wrap;">
+                <div style="font-size:13px;color:#64748B;font-weight:500;letter-spacing:0.3px;">
+                    PRESUPUESTO APROBADO {_year_latest}
+                </div>
+                <div style="font-size:28px;font-weight:700;color:#9F2241;font-variant-numeric:tabular-nums;letter-spacing:-0.4px;">
+                    {fmt_mxn(_total_l1)}
+                </div>
+                <div style="font-size:13px;color:#64748B;">· <b style="color:#0F172A;">{_n_programs}</b> programas a través de <b style="color:#0F172A;">16</b> categorías</div>
+            </div>
+            <div style="font-size:13px;color:#475569;margin:16px 0 0;line-height:1.55;max-width:860px;">
+                Reagrupado desde el crosswalk editorial. <b>No por "clasificación funcional"</b> —
+                por lo que ves cuando sales de tu casa.
             </div>
         </div>
         """)
 
         _grid = mo.md(
-            f'<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px;">{"".join(_cards)}</div>'
+            f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:22px;">{"".join(_cards)}</div>'
         )
 
-        _cat = citizen_pick.value
+        _cat = _selected
         _color = CITIZEN_PALETTE.get(_cat, "#9F2241")
         _icon = CITIZEN_ICON.get(_cat, "•")
 
@@ -1374,79 +1408,114 @@ def _(
                  .sort("monto_aprobado", descending=True)
                  .head(20)
                  .to_pandas()
+                 .reset_index(drop=True)
         )
 
         if len(_l2) == 0:
             _l2_html = f"""
-            <div style="padding:18px;background:#F8FAFC;border:1.5px dashed #CBD5E1;border-radius:10px;color:#64748B;font-size:13px;text-align:center;">
-                Sin programas desagregados para <b>{_cat}</b> en el crosswalk.
-                La categoría existe como Level 1 pero sus partidas no se nombraron editorialmente.
+            <div style="padding:24px;background:#F8FAFC;border:1.5px dashed #CBD5E1;border-radius:10px;color:#64748B;font-size:13px;text-align:center;">
+                Sin programas desagregados para <b>{_cat}</b>.
+                Esta categoría existe a Level 1 pero sus partidas no se nombraron editorialmente.
             </div>
             """
         else:
             _rows_html = []
-            _l2_monto_total = float(_l2["monto_aprobado"].sum()) or 1.0
             for _i, _r in _l2.iterrows():
-                _pct = float(_r["per_100_of_parent"]) if _r["per_100_of_parent"] is not None else (_r["monto_aprobado"] / _l2_monto_total * 100)
-                _bar_pct = min(_pct * 1.1, 100)
+                _pct = float(_r["per_100_of_parent"]) if _r["per_100_of_parent"] is not None else 0.0
+                _bar_pct = min(_pct * 1.0, 100)
+                _rat_full = (_r["rationale"] or "").replace('"', "'")
+                _rat_text = (_r["rationale"] or "")
+                _rat_short = _rat_text[:160] + ("…" if len(_rat_text) > 160 else "")
                 _rows_html.append(f"""
-                <div style="padding:12px 0;border-bottom:1px solid #F1F5F9;">
-                    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;">
-                        <div style="flex:1;min-width:0;font-size:14px;font-weight:600;color:#0F172A;line-height:1.35;">
+                <div style="display:flex;gap:16px;padding:14px 0;border-bottom:1px solid #F1F5F9;align-items:start;">
+                    <div style="font-size:11px;color:{_color};font-weight:700;letter-spacing:1px;min-width:28px;padding-top:3px;">#{_i+1:02d}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:14px;font-weight:600;color:#0F172A;line-height:1.35;">
                             {_r['display_name']}
                         </div>
-                        <div style="font-size:14px;font-weight:700;color:#0F172A;white-space:nowrap;font-variant-numeric:tabular-nums;">
+                        <div style="font-size:12px;color:#64748B;margin-top:4px;line-height:1.45;" title="{_rat_full}">
+                            {_rat_short}
+                        </div>
+                        <div style="background:#F1F5F9;height:3px;border-radius:2px;margin-top:10px;overflow:hidden;max-width:540px;">
+                            <div style="background:{_color};height:100%;width:{_bar_pct:.1f}%;border-radius:2px;"></div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;min-width:110px;white-space:nowrap;">
+                        <div style="font-size:15px;font-weight:700;color:#0F172A;font-variant-numeric:tabular-nums;letter-spacing:-0.2px;">
                             {fmt_mxn(_r['monto_aprobado'])}
                         </div>
-                        <div style="font-size:12px;color:{_color};font-weight:600;white-space:nowrap;min-width:52px;text-align:right;">{_pct:.1f}%</div>
-                    </div>
-                    <div style="font-size:12px;color:#64748B;margin-top:4px;line-height:1.45;" title="{_r['rationale'] or ''}">
-                        {(_r['rationale'] or '')[:160]}
-                    </div>
-                    <div style="background:#F1F5F9;height:3px;border-radius:2px;margin-top:8px;overflow:hidden;">
-                        <div style="background:{_color};height:100%;width:{_bar_pct:.1f}%;"></div>
+                        <div style="font-size:11px;color:{_color};font-weight:700;margin-top:3px;">
+                            {_pct:.1f}% de la categoría
+                        </div>
                     </div>
                 </div>
                 """)
             _l2_html = "".join(_rows_html)
 
         _drill = mo.md(f"""
-        <div style="padding:22px 24px;background:white;border:1px solid #E2E8F0;border-radius:14px;border-top:4px solid {_color};">
-            <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
-                <div style="font-size:36px;">{_icon}</div>
-                <div>
-                    <div style="font-size:11px;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;">Detalle · {_cat}</div>
-                    <div style="font-size:22px;font-weight:700;color:#0F172A;letter-spacing:-0.3px;">
-                        {fmt_mxn(_l1_monto)} · {_l1_pct:.1f} de cada 100 pesos
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:14px;padding:24px 28px;
+             border-top:4px solid {_color};box-shadow:0 1px 3px rgba(15,23,42,0.04);">
+            <div style="display:flex;align-items:center;gap:18px;margin-bottom:14px;flex-wrap:wrap;">
+                <div style="font-size:46px;line-height:1;">{_icon}</div>
+                <div style="flex:1;min-width:220px;">
+                    <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:700;">Detalle</div>
+                    <div style="font-size:24px;font-weight:700;color:#0F172A;letter-spacing:-0.4px;line-height:1.2;margin-top:2px;">
+                        {_cat}
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:26px;font-weight:700;color:#0F172A;font-variant-numeric:tabular-nums;letter-spacing:-0.4px;">
+                        {fmt_mxn(_l1_monto)}
+                    </div>
+                    <div style="font-size:12px;color:{_color};font-weight:700;margin-top:2px;">
+                        {_l1_pct:.1f} de cada 100 pesos
                     </div>
                 </div>
             </div>
-            <div style="font-size:12px;color:#475569;margin:10px 0 16px;line-height:1.5;">
-                Programas presupuestarios desagregados (hasta 20). Cada renglón es un
-                programa concreto con su peso y su racional editorial. "Ver en datos
-                oficiales" en <code>data/clean/source_links.csv</code>.
+            <div style="font-size:12px;color:#475569;margin:0 0 18px;line-height:1.5;">
+                Programas presupuestarios desagregados (hasta 20), ordenados por monto. El porcentaje
+                a la derecha es sobre <b>{_cat}</b>; el total de la categoría está arriba a la derecha.
             </div>
             {_l2_html}
         </div>
         """)
 
         _footer = mo.md(
-            '<div style="margin:18px 0 0;padding:12px 16px;background:#FEF2F2;border-left:3px solid #9F2241;border-radius:6px;font-size:12px;color:#7F1D1D;line-height:1.5;">'
-            '<b>ℹ️ Metodología.</b> Este reparto se construye a partir del crosswalk editorial (<code>crosswalk/crosswalk.csv</code>). '
-            'Cada programa presupuestario se asigna a una de las 16 categorías con un racional explícito. '
-            'Ver <code>crosswalk/METHODOLOGY.md</code> para las decisiones controvertidas.'
+            '<div style="margin:18px 0 0;padding:14px 18px;background:#F8FAFC;border:1px solid #E2E8F0;'
+            'border-left:3px solid #94A3B8;border-radius:8px;font-size:12px;color:#475569;line-height:1.55;">'
+            '<b style="color:#0F172A;">Metodología.</b> Este reparto se construye a partir del crosswalk editorial '
+            '(<code>crosswalk/crosswalk.csv</code>): cada programa presupuestario se asigna a una de las 16 '
+            'categorías con un racional explícito. Decisiones controvertidas (pensiones, infraestructura '
+            'urbana, servicios públicos) en <code>crosswalk/METHODOLOGY.md</code>.'
             '</div>'
         )
 
-        act_ciudadano_content = mo.vstack([_hero, _grid, citizen_pick, _drill, _footer])
+        _picker_label = mo.md(
+            '<div style="font-size:11px;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;'
+            'font-weight:700;margin:4px 0 -2px;">Explorar una categoría</div>'
+        )
+
+        act_ciudadano_content = mo.vstack([
+            _hero, _grid, _picker_label, citizen_pick, _drill, _footer
+        ])
     return (act_ciudadano_content,)
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    emblemas_search = mo.ui.text(
+        placeholder="🔍 Busca un programa, ente o sección  (p.ej. Cablebús, Pilares, SIBISO, agua)…",
+        full_width=True,
+    )
+    return (emblemas_search,)
+
+
 @app.cell
-def _(fmt_mxn, mo, named_programs_df, pl):
-    # ⑦ Emblemáticos — flagship programs extracted from the Paquete Económico 2024
-    # narrative PDFs. These do NOT surface as desc_programa_presupuestario in the
-    # main CSV (Cablebús, Utopías, Altépetl, Cosecha de Lluvia, Comedores, etc.).
+def _(emblemas_search, fmt_mxn, mo, named_programs_df, pl):
+    # ⑦ Emblemáticos — flagship programs from the Paquete Económico 2024 PDFs.
+    # These do NOT surface as desc_programa_presupuestario in the main CSV.
+
+    import re as _re
 
     if named_programs_df is None:
         act_emblemas_content = mo.md(
@@ -1456,79 +1525,135 @@ def _(fmt_mxn, mo, named_programs_df, pl):
             '</div>'
         )
     else:
-        _df = (
+        _df_all = (
             named_programs_df
             .filter(pl.col("monto_aprobado_mxn") > 0)
             .sort("monto_aprobado_mxn", descending=True)
             .to_pandas()
+            .reset_index(drop=True)
         )
-        _total = float(_df["monto_aprobado_mxn"].sum())
+        _total_all = float(_df_all["monto_aprobado_mxn"].sum())
+        _n_all = len(_df_all)
+
+        _q = (emblemas_search.value or "").strip()
+        _q_lower = _q.lower()
+        if _q_lower:
+            _mask = (
+                _df_all["display_name"].fillna("").str.lower().str.contains(_q_lower, na=False, regex=False)
+                | _df_all["ente_ejecutor"].fillna("").str.lower().str.contains(_q_lower, na=False, regex=False)
+                | _df_all["section"].fillna("").str.lower().str.contains(_q_lower, na=False, regex=False)
+            )
+            _df = _df_all[_mask].reset_index(drop=True)
+        else:
+            _df = _df_all
+
         _n = len(_df)
+        _total = float(_df["monto_aprobado_mxn"].sum()) if _n else 0.0
+
+        if _q_lower:
+            _hero_subtitle = (
+                f'<div style="font-size:13px;color:#475569;margin:12px 0 0;line-height:1.55;">'
+                f'<b>{_n}</b> de <b>{_n_all}</b> programas coinciden con '
+                f'<span style="background:#FEF9C3;padding:2px 8px;border-radius:4px;font-family:ui-monospace,monospace;font-weight:600;color:#713F12;">{_q}</span>'
+                f' · total filtrado: <b style="color:#9F2241;">{fmt_mxn(_total)}</b> de {fmt_mxn(_total_all)}'
+                f'</div>'
+            )
+        else:
+            _hero_subtitle = (
+                f'<div style="font-size:13px;color:#475569;margin:14px 0 0;line-height:1.55;max-width:860px;">'
+                f'<b>Cablebús, Utopías, Pilares, Mi Beca, Altépetl, Cosecha de Lluvia, Comedores para el Bienestar</b> y otros '
+                f'<b>no aparecen con ese nombre</b> en la CSV oficial — viven a nivel de partida o de anexo. '
+                f'Estos pesos se extrajeron de los PDFs del Paquete Económico 2024.'
+                f'</div>'
+            )
 
         _hero = mo.md(f"""
-        <div style="padding:22px 26px;background:white;border:1px solid #E2E8F0;border-radius:14px;margin-bottom:14px;">
-            <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">⑦ Emblemáticos · los proyectos con nombre propio</div>
-            <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:4px;line-height:1.15;letter-spacing:-0.5px;">
-                {_n} programas emblemáticos · {fmt_mxn(_total)} identificados
+        <div style="padding:28px 34px;background:linear-gradient(135deg,#FDEBEE 0%,#FFF 55%,#FFF 100%);
+            border:1px solid #E2E8F0;border-radius:16px;margin-bottom:16px;
+            box-shadow:0 1px 3px rgba(15,23,42,0.03);">
+            <div style="font-size:11px;color:#9F2241;letter-spacing:2px;text-transform:uppercase;font-weight:700;">⑦ Emblemáticos · programas con nombre propio</div>
+            <div style="font-size:34px;font-weight:700;color:#0F172A;margin-top:10px;line-height:1.08;letter-spacing:-0.8px;">
+                {_n_all} programas · {fmt_mxn(_total_all)}
             </div>
-            <div style="font-size:13px;color:#475569;margin:10px 0 0;line-height:1.55;">
-                <b>Cablebús, Utopías, Pilares, Mi Beca, Altépetl, Cosecha de Lluvia, Comedores para el Bienestar</b> y otros
-                programas emblemáticos <b>no aparecen con ese nombre</b> en la CSV oficial de egresos — viven a nivel de
-                partida o de anexo. Estos pesos se extrajeron de los PDFs del Paquete Económico 2024 (Tomo I, Tomo II,
-                Anexos III-F y VI-F).
-            </div>
+            {_hero_subtitle}
         </div>
         """)
 
-        _sections = {}
-        for _, _r in _df.iterrows():
-            _sec = str(_r["section"] or "Otros").strip()
-            _sections.setdefault(_sec, []).append(_r)
+        _search_label = mo.md(
+            '<div style="font-size:11px;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;'
+            'font-weight:700;margin:4px 0 -2px;">Buscar</div>'
+        )
 
-        _section_blocks = []
-        for _sec_name, _rows in _sections.items():
-            _sec_total = sum(float(r["monto_aprobado_mxn"]) for r in _rows)
-            _rows_html = []
-            for _r in _rows:
-                _name = str(_r["display_name"] or "").strip()
-                _ente = str(_r["ente_ejecutor"] or "").strip()
-                _src = str(_r["source"] or "").strip()
-                _note = str(_r["notes"] or "").strip()
-                _rows_html.append(f"""
-                <div style="padding:11px 0;border-bottom:1px solid #F1F5F9;">
-                    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;">
+        if _n == 0:
+            _empty = mo.md(f"""
+            <div style="padding:48px 24px;background:white;border:1.5px dashed #CBD5E1;border-radius:14px;text-align:center;color:#64748B;">
+                <div style="font-size:44px;margin-bottom:10px;">🔍</div>
+                <div style="font-size:16px;font-weight:700;color:#0F172A;">Sin resultados para "{_q}"</div>
+                <div style="font-size:12px;margin-top:8px;">Prueba con <b>Cablebús</b>, <b>Pilares</b>, <b>SIBISO</b>, <b>agua</b>, o borra la búsqueda.</div>
+            </div>
+            """)
+            act_emblemas_content = mo.vstack([_hero, _search_label, emblemas_search, _empty])
+        else:
+            _pattern = _re.compile(_re.escape(_q), _re.IGNORECASE) if _q_lower else None
+
+            def _highlight(text):
+                if not _pattern or not text:
+                    return text
+                return _pattern.sub(
+                    lambda m: f'<mark style="background:#FEF9C3;padding:0 2px;border-radius:2px;color:#713F12;">{m.group()}</mark>',
+                    text,
+                )
+
+            _sections = {}
+            for _, _r in _df.iterrows():
+                _sec = str(_r["section"] or "Otros").strip()
+                _sections.setdefault(_sec, []).append(_r)
+
+            _section_blocks = []
+            for _sec_name, _rows in _sections.items():
+                _sec_total = sum(float(r["monto_aprobado_mxn"]) for r in _rows)
+                _rows_html = []
+                for _i, _r in enumerate(_rows):
+                    _name = str(_r["display_name"] or "").strip()
+                    _ente = str(_r["ente_ejecutor"] or "").strip()
+                    _src = str(_r["source"] or "").strip()
+                    _note = str(_r["notes"] or "").strip()
+                    _rows_html.append(f"""
+                    <div style="display:flex;gap:14px;padding:13px 0;border-bottom:1px solid #F1F5F9;align-items:start;">
+                        <div style="font-size:10px;color:#9F2241;font-weight:700;letter-spacing:1px;min-width:26px;padding-top:3px;">#{_i+1:02d}</div>
                         <div style="flex:1;min-width:0;">
-                            <div style="font-size:13px;font-weight:600;color:#0F172A;line-height:1.35;">{_name}</div>
-                            <div style="font-size:11px;color:#64748B;margin-top:3px;">{_ente}</div>
+                            <div style="font-size:13px;font-weight:600;color:#0F172A;line-height:1.35;">{_highlight(_name)}</div>
+                            <div style="font-size:11px;color:#64748B;margin-top:3px;">{_highlight(_ente)}</div>
+                            <div style="font-size:10px;color:#94A3B8;margin-top:4px;font-family:ui-monospace,monospace;">{_src} · {_note}</div>
                         </div>
-                        <div style="font-size:13px;font-weight:700;color:#9F2241;white-space:nowrap;font-variant-numeric:tabular-nums;">
+                        <div style="font-size:14px;font-weight:700;color:#9F2241;white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:-0.2px;">
                             {fmt_mxn(_r['monto_aprobado_mxn'])}
                         </div>
                     </div>
-                    <div style="font-size:10px;color:#94A3B8;margin-top:3px;font-family:ui-monospace,monospace;">{_src} · {_note}</div>
+                    """)
+                _section_blocks.append(f"""
+                <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;padding:18px 22px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,0.03);">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;gap:12px;flex-wrap:wrap;">
+                        <div style="font-size:12px;color:#64748B;letter-spacing:1.2px;text-transform:uppercase;font-weight:700;">{_highlight(_sec_name)}</div>
+                        <div style="font-size:13px;color:#9F2241;font-weight:700;font-variant-numeric:tabular-nums;">{fmt_mxn(_sec_total)} · {len(_rows)} programa{'s' if len(_rows) != 1 else ''}</div>
+                    </div>
+                    {''.join(_rows_html)}
                 </div>
                 """)
-            _section_blocks.append(f"""
-            <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;padding:16px 20px;margin-bottom:14px;">
-                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
-                    <div style="font-size:12px;color:#64748B;letter-spacing:1.2px;text-transform:uppercase;font-weight:600;">{_sec_name}</div>
-                    <div style="font-size:13px;color:#9F2241;font-weight:700;font-variant-numeric:tabular-nums;">{fmt_mxn(_sec_total)}</div>
-                </div>
-                {''.join(_rows_html)}
-            </div>
-            """)
 
-        _sections_md = mo.md("".join(_section_blocks))
+            _sections_md = mo.md("".join(_section_blocks))
 
-        _footer = mo.md(
-            '<div style="margin:8px 0 0;padding:12px 16px;background:#FEF2F2;border-left:3px solid #9F2241;border-radius:6px;font-size:12px;color:#7F1D1D;line-height:1.5;">'
-            '<b>ℹ️ Fuente editorial.</b> Los pesos y nombres vienen del Paquete Económico 2024 (PDFs en <code>data/raw/narrative_sources/</code>). '
-            'La columna <code>notes</code> cita página. Este es el <b>supplemento</b> al crosswalk — rellena el hueco de los programas bandera '
-            'que no surgen como <code>desc_programa_presupuestario</code> en la CSV oficial.'
-            '</div>'
-        )
+            _footer = mo.md(
+                '<div style="margin:8px 0 0;padding:14px 18px;background:#F8FAFC;border:1px solid #E2E8F0;'
+                'border-left:3px solid #94A3B8;border-radius:8px;font-size:12px;color:#475569;line-height:1.55;">'
+                '<b style="color:#0F172A;">Fuente editorial.</b> Pesos extraídos del Paquete Económico 2024 '
+                '(PDFs en <code>data/raw/narrative_sources/</code>). La columna <code>notes</code> cita la página. '
+                'Este es el supplemento al crosswalk — rellena el hueco de programas bandera que no surgen como '
+                '<code>desc_programa_presupuestario</code> en la CSV oficial.'
+                '</div>'
+            )
 
-        act_emblemas_content = mo.vstack([_hero, _sections_md, _footer])
+            act_emblemas_content = mo.vstack([_hero, _search_label, emblemas_search, _sections_md, _footer])
     return (act_emblemas_content,)
 
 

@@ -1,74 +1,48 @@
-# Red team · "Las fugas"
+# Red-team branch · "Patrones extraños"
 
-> The counter-thesis to `notebooks/obra_map.py`.
-> Same data, adversarial lens: where did the money *not* go?
+> A forensic audit of the CDMX open-data files themselves.
+> Curiosity-driven, not accusatory. Every finding comes with plausible innocent readings.
+
+## What this branch adds
+
+`notebooks/patrones.py` examines the same dataset (`rally_obras.csv`) used by the main map, but asks a different question: **does the published data hold together under its own rules?**
+
+Four patterns surface. None is proof of wrongdoing — each is a starting point for a reporter's follow-up:
+
+| Pattern | What we observe | Why it might be innocent | What a reporter would verify |
+|---|---|---|---|
+| **Benford deviation** | First digit *7* appears 15.6% of the time vs. 5.8% expected (+9.8pp) | Standard program amounts centered at $7M / $70k | Are these amounts clustered in one programa_presupuestario? |
+| **Round-number clustering** | 12.6% of >$100k amounts are exactly divisible by $1M | Decreed ceilings, formulaic distribution | Is there a priced expediente técnico behind each? |
+| **Coordinate duplicates** | 49 lat/long points host ≥3 distinct projects, totaling $61.5B | Default captures at alcaldía offices | Are these admin addresses or real worksites? |
+| **Impossible dates** | 3,195 projects have completion < start date | Capture errors, DD-MM vs. MM-DD swaps | Does the system validate ranges at entry? |
 
 ## Run side-by-side with the main map
 
-This repo is designed so both dashboards can run simultaneously on different ports, letting you flip between the two narratives in your browser.
-
-### With git worktrees (recommended)
-
 ```bash
-# From the main working copy
+# Main branch
+cd impact-lab-cdmx
+uv run marimo run notebooks/obra_map.py --port 2718
+
+# This branch (separate worktree)
 git worktree add ../impact-lab-cdmx-redteam -b red-team-accountability origin/red-team-accountability
 cd ../impact-lab-cdmx-redteam
-cp ../impact-lab-cdmx/data/*.csv data/     # reuse already-downloaded data
+cp ../impact-lab-cdmx/data/*.csv data/
 uv sync
-uv run marimo run notebooks/fugas.py --port 2720 --host 127.0.0.1
+uv run marimo run notebooks/patrones.py --port 2720
 ```
 
-Then in the main copy:
-
-```bash
-cd ../impact-lab-cdmx
-uv run marimo run notebooks/obra_map.py --port 2718 --host 127.0.0.1
-```
-
-Open **http://localhost:2718** (warm story) and **http://localhost:2720** (red team) in two tabs.
-
-### Without worktrees (branch switching)
-
-If you only want to see the red-team dashboard, check out the branch directly:
-
-```bash
-git checkout red-team-accountability
-uv sync
-bash scripts/download_data.sh
-uv run marimo run notebooks/fugas.py --port 2720
-```
-
-⚠️ Switching branches hides `notebooks/obra_map.py` — the worktree approach keeps both visible.
-
-## Port convention
-
-| Port | Dashboard | Branch |
-|------|-----------|--------|
-| 2718 | `notebooks/obra_map.py` — *Sigue tu peso* | `main` |
-| 2720 | `notebooks/fugas.py` — *Las fugas* | `red-team-accountability` |
-
-**Why not 2719?** That port is commonly taken by a second local marimo instance (e.g. an edit session). The red team sits on 2720 to avoid collisions with typical dev setups. Override with `--port <N>` if needed.
-
-## The counter-thesis in three numbers
-
-| Signal | Magnitude |
-|--------|----------:|
-| Share of contract money going to recipients marked *"no reportó información"* | **~86%** |
-| Federal money ejercido in projects stuck <25% avance físico | **~$25.4 mmdp (36.7%)** |
-| Beneficiarios claimed by projects costing <$1 per person | **~15.9 million** |
+Open **http://localhost:2718** (the warm map) and **http://localhost:2720** (the forensic view) in adjacent tabs.
 
 ## Design intent
 
 `obra_map` is **resident-facing** — warm palette, map-as-hero, drill-down on your street.
-`fugas` is **journalist-facing** — dark palette, watchlist-as-hero, red flags first.
+`patrones` is **reporter-facing** — navy/gold palette, pattern-as-hero, explicit criteria for every claim, innocent readings alongside each finding.
 
-Both dashboards are honest about the same data window (2013–2018). They differ only in what they choose to highlight.
+Both dashboards are built on the same dataset. They differ in the questions they ask.
 
-## When to run which
+## Methodology
 
-- **Community demo, policy pitch, citizen engagement** → `obra_map`
-- **Accountability deep-dive, FOI letter drafting, journalist briefing** → `fugas`
-
----
+All analyses use only the published CSV file. No external data, no imputation.
+Exact numeric criteria are in the notebook; reopen with `uv run marimo edit notebooks/patrones.py` to inspect or modify the thresholds.
 
 Back to main README: [`README.md`](./README.md)

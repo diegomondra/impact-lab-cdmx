@@ -2,13 +2,14 @@
 
 Interactive dashboards for Ciudad de México public data — built at Claude Mexico City Lab 2026.
 
-Three dashboards tell three stories with official data from [datos.cdmx.gob.mx](https://datos.cdmx.gob.mx):
+Four dashboards with official data from [datos.cdmx.gob.mx](https://datos.cdmx.gob.mx):
 
 | Dashboard | Story | Source |
 |---|---|---|
-| `notebooks/obra_map.py` | *¿Qué se construyó en tu calle?* — 23k georeferenced federal projects (2013–2018). Click any dot to see cost flow, beneficiaries, contractor, and contract PDF. | Rally ¿Cómo van las obras? |
-| `notebooks/budget_dashboard.py` | *¿A dónde va el dinero público?* — CDMX budget by purpose, agency, SDG, and chapter. Plan-vs-actual execution view. | Presupuesto de egresos 2023/2024 |
-| `notebooks/explore.py` | Generic CSV explorer — drop any CSV into `data/` and get instant charts. | — |
+| `notebooks/ruta_del_peso.py` | **La ruta de tu peso** — 3-act narrative: ① ingresos entran → ② egresos se prometen → ③ contratistas aterrizan. Filterable por año (2018–2024) y alcaldía. | Ingresos + Egresos CP 2018–2022 + Rally |
+| `notebooks/obra_map.py` | *¿Qué se construyó en tu calle?* — interactive map of 23k georeferenced federal projects (2013–2018). Click any dot for project detail. | Rally ¿Cómo van las obras? |
+| `notebooks/budget_dashboard.py` | *¿A dónde va el dinero público?* — CDMX budget by purpose, agency, SDG, chapter. Plan-vs-actual. | Presupuesto de egresos |
+| `notebooks/explore.py` | Generic CSV explorer — drop any CSV into `data/`, get instant charts. | — |
 
 ---
 
@@ -26,8 +27,8 @@ You don't need to install Python yourself — `uv` handles that.
 git clone git@github.com:diegomondra/impact-lab-cdmx.git
 cd impact-lab-cdmx
 uv sync                              # installs Python + all deps (~30s first time)
-bash scripts/download_data.sh        # downloads ~85MB of CDMX open data
-uv run marimo run notebooks/obra_map.py
+bash scripts/download_data.sh        # downloads ~220MB of CDMX open data
+uv run marimo run notebooks/ruta_del_peso.py   # featured 3-act narrative
 ```
 
 Browser opens at **http://localhost:2718**.
@@ -35,6 +36,7 @@ Browser opens at **http://localhost:2718**.
 To run a different dashboard, swap the last line:
 
 ```bash
+uv run marimo run notebooks/obra_map.py
 uv run marimo run notebooks/budget_dashboard.py
 uv run marimo run notebooks/explore.py
 ```
@@ -82,11 +84,12 @@ uv run marimo new notebooks/my_analysis.py
 .
 ├── data/                           # CSVs (gitignored — run scripts/download_data.sh)
 ├── notebooks/
+│   ├── ruta_del_peso.py            # 3-act narrative: ingresos → egresos → contratistas
 │   ├── obra_map.py                 # Map of federal projects in CDMX
 │   ├── budget_dashboard.py         # CDMX budget allocation dashboard
 │   └── explore.py                  # Generic CSV explorer
 ├── scripts/
-│   └── download_data.sh            # Fetches CDMX open data (~85MB)
+│   └── download_data.sh            # Fetches CDMX open data (~220MB)
 ├── pyproject.toml                  # Dependencies + marimo config
 └── README.md
 ```

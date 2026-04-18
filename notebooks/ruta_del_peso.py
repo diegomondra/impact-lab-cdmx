@@ -379,7 +379,7 @@ def _(
 
     _left = mo.md(f"""
     <div style="padding:22px 24px;background:white;border:1px solid #E2E8F0;border-radius:14px;">
-        <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto I · Entran</div>
+        <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto II · Entran</div>
         <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:4px;line-height:1.15;letter-spacing:-0.5px;">
             {fmt_mxn(_total)} {_label} en {_year}
         </div>
@@ -417,14 +417,59 @@ def _(
         font=dict(family="Inter, system-ui, sans-serif"),
     )
 
+    _conceptos = (
+        _use.group_by(["_bucket", "desc_concepto"])
+            .agg(pl.col(_amount_col).sum().alias("monto"))
+            .filter(pl.col("monto") > 0)
+            .filter(pl.col("desc_concepto").is_not_null())
+            .sort("monto", descending=True)
+            .head(15)
+            .to_pandas()
+            .iloc[::-1]
+            .reset_index(drop=True)
+    )
+    _conceptos["color"] = _conceptos["_bucket"].map(SOURCE_COLORS).fillna("#94A3B8")
+    _conceptos["label"] = _conceptos["monto"].apply(fmt_mxn)
+    _conceptos["concepto_trunc"] = _conceptos["desc_concepto"].str.slice(0, 60)
+
+    _fig_detail = go.Figure(go.Bar(
+        y=_conceptos["concepto_trunc"], x=_conceptos["monto"],
+        orientation="h",
+        marker=dict(color=_conceptos["color"].tolist()),
+        text=_conceptos["label"],
+        textposition="outside",
+        textfont=dict(size=11, color="#334155"),
+        hovertemplate="<b>%{customdata}</b><br>%{text}<extra></extra>",
+        customdata=_conceptos["desc_concepto"].tolist(),
+        cliponaxis=False,
+    ))
+    _fig_detail.update_layout(
+        height=max(300, 28 * len(_conceptos) + 60),
+        margin=dict(l=10, r=60, t=10, b=30),
+        xaxis=dict(showgrid=True, gridcolor="#F1F5F9", tickformat=".2s", title=""),
+        yaxis=dict(title="", tickfont=dict(size=11)),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, system-ui, sans-serif", size=11),
+    )
+
+    _detail_header = mo.md("""
+    <div style="margin:24px 0 10px;padding:14px 18px;background:#F8FAFC;border-radius:10px;border-left:3px solid #9F2241;">
+        <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#64748B;font-weight:600;">Detalle · nivel 2</div>
+        <div style="font-size:17px;font-weight:700;color:#0F172A;margin-top:4px;">Los 15 conceptos con mayor monto</div>
+        <div style="font-size:12px;color:#475569;margin-top:4px;">Los colores corresponden al cubo de origen. Predial, nómina, participaciones federales, etc.</div>
+    </div>
+    """)
+
     _transition = mo.md(
         f'<div style="margin:18px 0 0;padding:14px 18px;background:#FEF2F2;border-left:3px solid #9F2241;border-radius:6px;font-size:13px;color:#7F1D1D;line-height:1.5;">'
-        f'<b>→ Acto II.</b> De estos <b>{fmt_mxn(_total)}</b>, ¿cuánto se prometió gastar — y cuánto se ejerció realmente?'
+        f'<b>→ Acto III.</b> De estos <b>{fmt_mxn(_total)}</b>, ¿cuánto se prometió gastar — y cuánto se ejerció realmente?'
         f'</div>'
     )
 
     act1_content = mo.vstack([
-        mo.hstack([_left, mo.ui.plotly(_fig)], justify="start", gap=1.5, widths=[1, 1], wrap=True),
+        mo.hstack([_left, _fig], justify="start", gap=1.5, widths=[1, 1], wrap=True),
+        _detail_header,
+        _fig_detail,
         _transition,
     ])
     return (act1_content,)
@@ -523,7 +568,7 @@ def _(alcaldia_pick, egresos_df, fmt_mxn, go, has_ejercido, mo, pl, year_pick):
 
     _left = mo.md(f"""
     <div style="padding:22px 24px;background:white;border:1px solid #E2E8F0;border-radius:14px;">
-        <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto II · Se prometen</div>
+        <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto III · Se prometen</div>
         <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:4px;line-height:1.15;letter-spacing:-0.5px;">
             {_hero_stat} en {_year}{_alc_scope}
         </div>
@@ -539,6 +584,71 @@ def _(alcaldia_pick, egresos_df, fmt_mxn, go, has_ejercido, mo, pl, year_pick):
     </div>
     """)
 
+    _progs = (
+        _eg.with_columns(pl.col("desc_programa_presupuestario").fill_null("Sin programa"))
+            .filter(pl.col("desc_programa_presupuestario") != "Sin programa")
+            .group_by("desc_programa_presupuestario")
+            .agg([
+                pl.col("_budget").sum().alias("budget"),
+                pl.col("_spent").sum().alias("spent"),
+            ])
+            .filter(pl.col("budget") > 0)
+            .sort("budget", descending=True)
+            .head(15)
+            .to_pandas()
+            .iloc[::-1]
+            .reset_index(drop=True)
+    )
+    _progs["exec_pct"] = (_progs["spent"] / _progs["budget"].where(_progs["budget"] > 0, 1) * 100).fillna(0)
+    _progs["label_budget"] = _progs["budget"].apply(fmt_mxn)
+    _progs["label_spent"] = _progs["spent"].apply(fmt_mxn)
+
+    _fig_progs = go.Figure()
+    _fig_progs.add_trace(go.Bar(
+        y=_progs["desc_programa_presupuestario"], x=_progs["budget"], orientation="h",
+        marker=dict(color="#E2E8F0"), width=0.78,
+        name="Presupuesto",
+        hovertemplate="<b>%{y}</b><br>Plan: %{customdata}<extra></extra>",
+        customdata=_progs["label_budget"],
+    ))
+    if has_ejercido:
+        _fig_progs.add_trace(go.Bar(
+            y=_progs["desc_programa_presupuestario"], x=_progs["spent"], orientation="h",
+            marker=dict(color=[_exec_color(p) for p in _progs["exec_pct"]]),
+            width=0.42, name="Ejercido",
+            hovertemplate="<b>%{y}</b><br>Ejercido: %{customdata}<extra></extra>",
+            customdata=_progs["label_spent"],
+        ))
+        _fig_progs.add_trace(go.Scatter(
+            y=_progs["desc_programa_presupuestario"], x=_progs["budget"],
+            mode="text",
+            text=[f"  {p:.0f}%" for p in _progs["exec_pct"]],
+            textposition="middle right",
+            textfont=dict(size=10, family="Inter",
+                          color=[_exec_color(p) for p in _progs["exec_pct"]]),
+            showlegend=False, hoverinfo="skip", cliponaxis=False,
+        ))
+    _fig_progs.update_layout(
+        barmode="overlay", bargap=0.35,
+        xaxis=dict(showgrid=True, gridcolor="#F1F5F9", tickformat=".2s", title="",
+                   range=[0, float(_progs["budget"].max() or 1) * 1.14]),
+        yaxis=dict(title="", tickfont=dict(size=10), automargin=True),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, xanchor="left",
+                    bgcolor="rgba(0,0,0,0)"),
+        height=max(400, 30 * len(_progs) + 60),
+        margin=dict(l=10, r=40, t=40, b=20),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, system-ui, sans-serif", size=11),
+    )
+
+    _detail_header = mo.md("""
+    <div style="margin:24px 0 10px;padding:14px 18px;background:#F8FAFC;border-radius:10px;border-left:3px solid #9F2241;">
+        <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#64748B;font-weight:600;">Detalle · nivel 2</div>
+        <div style="font-size:17px;font-weight:700;color:#0F172A;margin-top:4px;">Los 15 programas presupuestarios con mayor monto</div>
+        <div style="font-size:12px;color:#475569;margin-top:4px;">Un capítulo agrupa muchos programas. Este desglose muestra los programas concretos donde se ejerció el dinero.</div>
+    </div>
+    """)
+
     if has_ejercido:
         _next = f"De los <b>{fmt_mxn(_total_spent)}</b> ejercidos, ¿quiénes los recibieron como contratos?"
     else:
@@ -546,12 +656,14 @@ def _(alcaldia_pick, egresos_df, fmt_mxn, go, has_ejercido, mo, pl, year_pick):
 
     _transition = mo.md(
         f'<div style="margin:18px 0 0;padding:14px 18px;background:#FEF2F2;border-left:3px solid #9F2241;border-radius:6px;font-size:13px;color:#7F1D1D;line-height:1.5;">'
-        f'<b>→ Acto III.</b> {_next}'
+        f'<b>→ Acto IV.</b> {_next}'
         f'</div>'
     )
 
     act2_content = mo.vstack([
-        mo.hstack([_left, mo.ui.plotly(_fig)], justify="start", gap=1.5, widths=[1, 2], wrap=True),
+        mo.hstack([_left, _fig], justify="start", gap=1.5, widths=[1, 2], wrap=True),
+        _detail_header,
+        _fig_progs,
         _transition,
     ])
     return (act2_content,)
@@ -632,7 +744,7 @@ def _(alcaldia_pick, fmt_int, fmt_mxn, go, mo, pl, rally_raw, year_pick):
 
         _left = mo.md(f"""
         <div style="padding:22px 24px;background:white;border:1px solid #E2E8F0;border-radius:14px;">
-            <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto III · Aterrizan</div>
+            <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto IV · Aterrizan</div>
             <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:4px;line-height:1.15;letter-spacing:-0.5px;">
                 Las 10 empresas top concentraron <span style="color:#9F2241">{_top10_pct:.0f}%</span>
             </div>
@@ -673,8 +785,66 @@ def _(alcaldia_pick, fmt_int, fmt_mxn, go, mo, pl, rally_raw, year_pick):
             font=dict(family="Inter, system-ui, sans-serif"),
         )
 
+        _top_contracts = (
+            _rally.sort("monto_ejercido", descending=True)
+                  .head(15)
+                  .select([
+                      "nombre_proyecto", "contratista", "desc_alcaldia",
+                      "ciclo", "monto_ejercido", "avance_fisico",
+                  ])
+                  .to_pandas()
+        )
+
+        _contract_rows = []
+        for _i, _row in _top_contracts.iterrows():
+            _name = str(_row["nombre_proyecto"] or "(sin nombre)").strip()[:80]
+            _cont = str(_row["contratista"] or "—").strip()[:42]
+            _alc = str(_row["desc_alcaldia"] or "—").strip()[:26]
+            _avc = float(_row["avance_fisico"] or 0)
+            _avc_color = "#059669" if _avc >= 95 else ("#D97706" if _avc >= 25 else "#DC2626")
+            _contract_rows.append(f"""
+            <tr>
+                <td style="padding:10px 8px;vertical-align:top;font-size:12px;color:#9F2241;font-weight:600;">#{_i+1}</td>
+                <td style="padding:10px 8px;vertical-align:top;font-size:13px;color:#0F172A;line-height:1.4;">
+                    <div style="font-weight:600;">{_name}</div>
+                    <div style="font-size:11px;color:#64748B;margin-top:2px;">{_cont} · {_alc} · {int(_row['ciclo'])}</div>
+                </td>
+                <td style="padding:10px 8px;vertical-align:top;text-align:right;font-size:13px;font-weight:700;color:#0F172A;white-space:nowrap;">{fmt_mxn(_row['monto_ejercido'])}</td>
+                <td style="padding:10px 8px;vertical-align:top;text-align:right;font-size:12px;font-weight:600;color:{_avc_color};white-space:nowrap;">{_avc:.0f}%</td>
+            </tr>
+            """)
+
+        _detail_section = mo.md(f"""
+        <div style="margin:24px 0 10px;padding:14px 18px;background:#F8FAFC;border-radius:10px;border-left:3px solid #9F2241;">
+            <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#64748B;font-weight:600;">Detalle · nivel 2</div>
+            <div style="font-size:17px;font-weight:700;color:#0F172A;margin-top:4px;">Los 15 contratos individuales más grandes</div>
+            <div style="font-size:12px;color:#475569;margin-top:4px;">Un contratista recibe muchos contratos — aquí están los contratos específicos más grandes del agregado.</div>
+        </div>
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;padding:6px 14px;overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-family:Inter,system-ui,sans-serif;">
+                <thead>
+                    <tr style="border-bottom:1px solid #E2E8F0;color:#64748B;font-size:10px;letter-spacing:1px;text-transform:uppercase;">
+                        <th style="padding:10px 8px;text-align:left;font-weight:600;">#</th>
+                        <th style="padding:10px 8px;text-align:left;font-weight:600;">Proyecto · contratista · alcaldía · año</th>
+                        <th style="padding:10px 8px;text-align:right;font-weight:600;">Monto ejercido</th>
+                        <th style="padding:10px 8px;text-align:right;font-weight:600;">Avance</th>
+                    </tr>
+                </thead>
+                <tbody>{''.join(_contract_rows)}</tbody>
+            </table>
+        </div>
+        """)
+
+        _transition = mo.md(
+            '<div style="margin:18px 0 0;padding:14px 18px;background:#FEF2F2;border-left:3px solid #9F2241;border-radius:6px;font-size:13px;color:#7F1D1D;line-height:1.5;">'
+            '<b>→ Acto V.</b> ¿Cómo cambia todo esto a lo largo del tiempo? Ver tendencias multi-año.'
+            '</div>'
+        )
+
         act3_content = mo.vstack([
-            mo.hstack([_left, mo.ui.plotly(_fig)], justify="start", gap=1.5, widths=[1, 1], wrap=True),
+            mo.hstack([_left, _fig], justify="start", gap=1.5, widths=[1, 1], wrap=True),
+            _detail_section,
+            _transition,
         ])
     return (act3_content,)
 
@@ -843,7 +1013,7 @@ def _(
 
     _intro = mo.md("""
     <div style="padding:22px 24px 18px;background:white;border:1px solid #E2E8F0;border-radius:14px;margin-bottom:14px;">
-        <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto IV · Explora</div>
+        <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto V · Explora</div>
         <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:4px;line-height:1.15;letter-spacing:-0.5px;">
             Tendencias multi-año
         </div>
@@ -997,7 +1167,7 @@ def _(
 
     _hero = mo.md(f"""
     <div style="padding:22px 26px;background:white;border:1px solid #E2E8F0;border-radius:14px;margin-bottom:14px;">
-        <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto IV · Flujo</div>
+        <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto I · Flujo</div>
         <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:4px;line-height:1.2;letter-spacing:-0.5px;">
             De las fuentes, al capítulo de gasto
         </div>
@@ -1020,7 +1190,13 @@ def _(
     </div>
     """)
 
-    act_flujo_content = mo.vstack([_hero, _fig_sk])
+    _transition = mo.md(
+        '<div style="margin:14px 0 0;padding:14px 18px;background:#FEF2F2;border-left:3px solid #9F2241;border-radius:6px;font-size:13px;color:#7F1D1D;line-height:1.5;">'
+        '<b>→ Detalles en los siguientes actos.</b> Acto II te muestra de dónde vinieron exactamente los pesos; Acto III, qué se programó y cuánto se ejerció; Acto IV, en qué empresas aterrizó el gasto.'
+        '</div>'
+    )
+
+    act_flujo_content = mo.vstack([_hero, _fig_sk, _transition])
     return (act_flujo_content,)
 
 
@@ -1028,13 +1204,13 @@ def _(
 def _(mo):
     step = mo.ui.tabs(
         {
-            "① Entran":       mo.md(""),
-            "② Se prometen":  mo.md(""),
-            "③ Aterrizan":    mo.md(""),
-            "④ Flujo":        mo.md(""),
+            "① Flujo":        mo.md(""),
+            "② Entran":       mo.md(""),
+            "③ Se prometen":  mo.md(""),
+            "④ Aterrizan":    mo.md(""),
             "⑤ Explora":      mo.md(""),
         },
-        value="① Entran",
+        value="① Flujo",
     )
     step
     return (step,)
@@ -1043,13 +1219,13 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(act1_content, act2_content, act3_content, act4_content, act_flujo_content, step):
     _map = {
-        "① Entran":       act1_content,
-        "② Se prometen":  act2_content,
-        "③ Aterrizan":    act3_content,
-        "④ Flujo":        act_flujo_content,
+        "① Flujo":        act_flujo_content,
+        "② Entran":       act1_content,
+        "③ Se prometen":  act2_content,
+        "④ Aterrizan":    act3_content,
         "⑤ Explora":      act4_content,
     }
-    _map.get(step.value, act1_content)
+    _map.get(step.value, act_flujo_content)
     return
 
 

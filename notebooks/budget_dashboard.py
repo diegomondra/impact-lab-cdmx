@@ -14,17 +14,30 @@ def _(mo):
         """
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+        :root {
+            --font-display: 'Sora', 'IBM Plex Sans', sans-serif;
+            --font-body: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
+            --text-strong: #0f172a;
+            --text-muted: #57657a;
+            --surface-card: linear-gradient(170deg, #ffffff 0%, #f8fbff 100%);
+            --surface-soft: #f8fafc;
+            --border-soft: #dbe7f3;
+            --radius-lg: 14px;
+            --radius-xl: 20px;
+            --shadow-card: 0 10px 22px rgba(15, 23, 42, 0.08);
+            --shadow-hero: 0 20px 50px rgba(10, 19, 32, 0.34);
+        }
         .civic-hero {
-            font-family: 'Sora', 'IBM Plex Sans', sans-serif;
+            font-family: var(--font-display);
             padding: 40px 44px 34px;
             background:
                 radial-gradient(1200px 220px at 80% -20%, rgba(254, 205, 96, 0.22), transparent 60%),
                 linear-gradient(120deg, #0f1b2e 0%, #1b2f4c 42%, #243d63 100%);
             color: #f8fafc;
-            border-radius: 20px;
+            border-radius: var(--radius-xl);
             margin-bottom: 10px;
             border: 1px solid rgba(255, 255, 255, 0.14);
-            box-shadow: 0 20px 50px rgba(10, 19, 32, 0.34);
+            box-shadow: var(--shadow-hero);
             position: relative;
             overflow: hidden;
         }
@@ -41,9 +54,60 @@ def _(mo):
             position: relative;
             z-index: 1;
         }
+        .civic-note {
+            margin: 10px 0 20px;
+            padding: 14px 18px;
+            background: linear-gradient(120deg, #fff9e8 0%, #fff3d5 100%);
+            border: 1px solid #f3d58c;
+            border-left: 5px solid #d97706;
+            border-radius: 12px;
+            color: #7c3b07;
+            font-family: var(--font-body);
+            font-size: 13px;
+            line-height: 1.55;
+            box-shadow: 0 8px 18px rgba(217, 119, 6, 0.08);
+        }
+        .fx-rise {
+            animation: riseIn 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+        }
+        .fx-delay-1 {
+            animation-delay: 80ms;
+        }
+        .fx-delay-2 {
+            animation-delay: 150ms;
+        }
+        .fx-card {
+            transition: transform 240ms ease, box-shadow 240ms ease;
+        }
+        .fx-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+        }
+        @keyframes riseIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .fx-rise {
+                animation: none;
+            }
+            .fx-card {
+                transition: none;
+            }
+            .fx-card:hover {
+                transform: none;
+                box-shadow: var(--shadow-card);
+            }
+        }
         </style>
 
-        <div class="civic-hero">
+        <div class="civic-hero fx-rise">
         <div style="font-size: 12px; letter-spacing: 2.8px; opacity: 0.85; text-transform: uppercase; font-weight: 700; color:#ffd98a;">
             Ciudad de México · Presupuesto de Egresos
         </div>
@@ -57,18 +121,7 @@ def _(mo):
         </div>
         </div>
 
-        <div style="
-            margin: 10px 0 20px;
-            padding: 14px 18px;
-            background: linear-gradient(120deg, #fff9e8 0%, #fff3d5 100%);
-            border: 1px solid #f3d58c;
-            border-left: 5px solid #d97706;
-            border-radius: 12px;
-            color: #7c3b07;
-            font-size: 13px;
-            line-height: 1.55;
-            box-shadow: 0 8px 18px rgba(217, 119, 6, 0.08);
-        ">
+        <div class="civic-note fx-rise fx-delay-1">
         <b>Alineación temporal del análisis.</b> Para mantener comparabilidad con el mapa de obra
         georreferenciada (2013-2018), este tablero prioriza los cortes 2018-2019 y conserva
         2023-2024 como referencia más reciente.
@@ -89,16 +142,16 @@ def _():
     DATA_DIR = Path(__file__).parent.parent / "data"
 
     PALETTE = [
-        "#9F2241",
-        "#E3007E",
-        "#EC6730",
-        "#00A489",
-        "#00B7CD",
-        "#6C4A7E",
-        "#D6A461",
-        "#3D5A80",
-        "#C14953",
+        "#23395B",
+        "#2F6690",
+        "#3A7CA5",
+        "#00A7A0",
+        "#F4A259",
+        "#C94C4C",
+        "#7B2D26",
+        "#6D597A",
         "#2A9D8F",
+        "#264653",
     ]
 
     FONT = "Sora, IBM Plex Sans, -apple-system, system-ui, sans-serif"
@@ -127,9 +180,9 @@ def _():
             margin=dict(l=20, r=20, t=50 if title else 20, b=20),
             height=height,
             hoverlabel=dict(
-                bgcolor="white",
-                bordercolor="#E2E8F0",
-                font=dict(family=FONT, size=12, color="#1E293B"),
+                bgcolor="#0f172a",
+                bordercolor="#334155",
+                font=dict(family=FONT, size=12, color="#f8fafc"),
             ),
             title=dict(
                 text=title,
@@ -139,6 +192,12 @@ def _():
             )
             if title
             else None,
+            legend=dict(
+                font=dict(family=FONT, size=11, color="#334155"),
+                bgcolor="rgba(255,255,255,0.74)",
+                bordercolor="#dbe7f3",
+                borderwidth=1,
+            ),
         )
         return fig
 
@@ -183,6 +242,22 @@ def _(datasets, mo):
         value=list(datasets.keys())[0],
         label="Año / corte",
     )
+    mo.md(
+        """
+        <div class="fx-card fx-rise fx-delay-1" style="
+            margin: 10px 0 14px;
+            padding: 12px 14px;
+            background: var(--surface-card);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+        ">
+            <div style="font-family: var(--font-body); font-size:11px; color: var(--text-muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; font-weight:700;">
+                Selector de corte temporal
+            </div>
+        </div>
+        """
+    )
     mo.hstack([year_picker], justify="start")
     return (year_picker,)
 
@@ -191,13 +266,14 @@ def _(datasets, mo):
 def _(mo):
     mo.md(
         """
-        <div style="
+        <div class="fx-card fx-rise fx-delay-2" style="
             margin: 10px 0 14px;
             padding: 14px 16px;
-            background: #F8FAFC;
-            border: 1px solid #E2E8F0;
-            border-radius: 10px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-lg);
             color: #334155;
+            font-family: var(--font-body);
             font-size: 13px;
             line-height: 1.55;
         ">
@@ -255,23 +331,23 @@ def _(budget_label, df, fmt_mxn, has_spent, mo):
 
     def _kpi(label, value, accent="#9F2241", sub=None):
         _sub_html = (
-            f'<div style="font-size:11px;color:#64748B;margin-top:4px;letter-spacing:0.5px;text-transform:uppercase;">{sub}</div>'
+            f'<div style="font-size:11px;color:var(--text-muted);margin-top:4px;letter-spacing:0.5px;text-transform:uppercase;">{sub}</div>'
             if sub
             else ""
         )
         return f"""
-        <div style="
-            background: linear-gradient(170deg, #ffffff 0%, #f8fbff 100%);
-            border: 1px solid #dbe7f3;
+        <div class="fx-card" style="
+            background: var(--surface-card);
+            border: 1px solid var(--border-soft);
             border-top: 5px solid {accent};
-            border-radius: 14px;
+            border-radius: var(--radius-lg);
             padding: 20px 22px 18px;
             flex: 1;
             min-width: 200px;
-            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+            box-shadow: var(--shadow-card);
         ">
-            <div style="font-size:10px;color:#57657a;letter-spacing:1.35px;text-transform:uppercase;font-weight:700;">{label}</div>
-            <div style="font-size:30px;font-weight:800;color:#0F172A;margin-top:8px;letter-spacing:-0.7px;line-height:1.1;">{value}</div>
+            <div style="font-size:10px;color:var(--text-muted);letter-spacing:1.35px;text-transform:uppercase;font-weight:700;">{label}</div>
+            <div style="font-size:30px;font-weight:800;color:var(--text-strong);margin-top:8px;letter-spacing:-0.7px;line-height:1.1;">{value}</div>
             {_sub_html}
         </div>
         """
@@ -293,7 +369,7 @@ def _(budget_label, df, fmt_mxn, has_spent, mo):
     _cards.append(_kpi("Programas presupuestarios", f"{_n_programs:,}", "#EC6730"))
 
     mo.md(
-        f'<div style="display:flex;gap:14px;flex-wrap:wrap;margin:16px 0 24px;">{"".join(_cards)}</div>'
+        f'<div class="fx-rise fx-delay-2" style="display:flex;gap:14px;flex-wrap:wrap;margin:16px 0 24px;">{"".join(_cards)}</div>'
     )
     return
 
@@ -384,7 +460,7 @@ def _(df, fmt_mxn, go, has_spent, pl, style_fig):
                 textposition="middle right",
                 textfont=dict(
                     size=12,
-                    family="Inter",
+                    family="Sora",
                     color=[_exec_color(p) for p in _top["exec_pct"]],
                 ),
                 showlegend=False,
@@ -453,7 +529,7 @@ def _(df, fmt_mxn, pl, px, style_fig):
         orientation="h",
         text="label",
         color="_amount",
-        color_continuous_scale=[[0, "#F8BBD0"], [1, "#9F2241"]],
+        color_continuous_scale=[[0, "#d8e4f2"], [1, "#2f6690"]],
     )
     _fig.update_traces(
         textposition="outside",
@@ -581,9 +657,11 @@ def _(PALETTE, df, fmt_mxn, go, pl, style_fig):
             labels=cap["desc_capitulo"],
             values=cap["_amount"],
             hole=0.55,
-            marker=dict(colors=PALETTE[: len(cap)], line=dict(color="white", width=2)),
+            marker=dict(
+                colors=PALETTE[: len(cap)], line=dict(color="#f8fafc", width=2)
+            ),
             textinfo="percent",
-            textfont=dict(size=13, color="white", family="Inter"),
+            textfont=dict(size=13, color="white", family="Sora"),
             hovertemplate="<b>%{label}</b><br>%{customdata}<br>%{percent}<extra></extra>",
             customdata=cap["label"],
             sort=False,
@@ -633,6 +711,23 @@ def _(mo):
         placeholder="Buscar unidad responsable, programa o partida...",
         full_width=True,
     )
+    mo.md(
+        """
+        <div class="fx-card fx-rise" style="
+            margin: 8px 0 8px;
+            padding: 10px 12px;
+            background: var(--surface-card);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            font-family: var(--font-body);
+            font-size: 12px;
+            color: var(--text-muted);
+        ">
+            Busca por dependencia, programa, función o partida.
+        </div>
+        """
+    )
     search
     return (search,)
 
@@ -655,9 +750,21 @@ def _(df, fmt_mxn, mo, pl, search):
         .str.contains(q, literal=True)
     )
     matches = df.filter(mask)
-    mo.md(
-        f"**{matches.height:,} coincidencias** · total: **{fmt_mxn(matches['_amount'].sum())}**"
-    )
+    mo.md(f"""
+    <div class="fx-card fx-rise" style="
+        margin: 8px 0 10px;
+        padding: 12px 14px;
+        background: var(--surface-card);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        font-family: var(--font-body);
+        color: var(--text-strong);
+        font-size: 14px;
+    ">
+        <b>{matches.height:,}</b> coincidencias · total: <b>{fmt_mxn(matches["_amount"].sum())}</b>
+    </div>
+    """)
     return (matches,)
 
 
@@ -679,6 +786,23 @@ def _(fmt_mxn, matches, mo, pl):
         )
         .select(["Unidad", "Programa", "Monto"])
         .to_pandas()
+    )
+    mo.md(
+        """
+        <div class="fx-card fx-rise" style="
+            margin: 8px 0 12px;
+            padding: 10px 12px;
+            background: var(--surface-card);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            font-family: var(--font-body);
+            font-size: 12px;
+            color: var(--text-muted);
+        ">
+            Top resultados agregados (máximo 50 filas)
+        </div>
+        """
     )
     mo.ui.table(display, selection=None, page_size=15)
     return

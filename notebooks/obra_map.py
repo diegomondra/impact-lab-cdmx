@@ -13,17 +13,30 @@ def _(mo):
         """
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+        :root {
+            --font-display: 'Sora', 'IBM Plex Sans', sans-serif;
+            --font-body: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
+            --text-strong: #0f172a;
+            --text-muted: #57657a;
+            --surface-card: linear-gradient(170deg, #ffffff 0%, #f8fbff 100%);
+            --surface-soft: #f8fafc;
+            --border-soft: #dbe7f3;
+            --radius-lg: 14px;
+            --radius-xl: 20px;
+            --shadow-card: 0 10px 22px rgba(15, 23, 42, 0.08);
+            --shadow-hero: 0 22px 52px rgba(50, 15, 36, 0.35);
+        }
         .obra-hero {
-            font-family: 'Sora', 'IBM Plex Sans', sans-serif;
+            font-family: var(--font-display);
             padding: 40px 44px 34px;
             background:
                 radial-gradient(900px 220px at 90% -10%, rgba(58, 173, 220, 0.26), transparent 60%),
                 linear-gradient(130deg, #2a1033 0%, #4f1a43 42%, #77253f 100%);
             color: #f8fafc;
-            border-radius: 20px;
+            border-radius: var(--radius-xl);
             margin-bottom: 10px;
             border: 1px solid rgba(255, 255, 255, 0.16);
-            box-shadow: 0 22px 52px rgba(50, 15, 36, 0.35);
+            box-shadow: var(--shadow-hero);
             position: relative;
             overflow: hidden;
         }
@@ -38,9 +51,60 @@ def _(mo):
             position: relative;
             z-index: 1;
         }
+        .obra-note {
+            margin: 10px 0 20px;
+            padding: 14px 18px;
+            background: linear-gradient(120deg, #fff9e8 0%, #fff3d5 100%);
+            border: 1px solid #f3d58c;
+            border-left: 5px solid #d97706;
+            border-radius: 12px;
+            color: #7c3b07;
+            font-family: var(--font-body);
+            font-size: 13px;
+            line-height: 1.55;
+            box-shadow: 0 8px 18px rgba(217, 119, 6, 0.08);
+        }
+        .fx-rise {
+            animation: riseIn 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+        }
+        .fx-delay-1 {
+            animation-delay: 80ms;
+        }
+        .fx-delay-2 {
+            animation-delay: 150ms;
+        }
+        .fx-card {
+            transition: transform 240ms ease, box-shadow 240ms ease;
+        }
+        .fx-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+        }
+        @keyframes riseIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .fx-rise {
+                animation: none;
+            }
+            .fx-card {
+                transition: none;
+            }
+            .fx-card:hover {
+                transform: none;
+                box-shadow: var(--shadow-card);
+            }
+        }
         </style>
 
-        <div class="obra-hero">
+        <div class="obra-hero fx-rise">
         <div style="font-size: 12px; letter-spacing: 2.8px; opacity: 0.85; text-transform: uppercase; font-weight: 700; color:#96def8;">
             Ciudad de México · Inversión con recursos federales
         </div>
@@ -52,18 +116,7 @@ def _(mo):
             abre un punto y revisa costo, avance, contratista y trazabilidad territorial.
         </div>
         </div>
-        <div style="
-            margin: 10px 0 20px;
-            padding: 14px 18px;
-            background: linear-gradient(120deg, #fff9e8 0%, #fff3d5 100%);
-            border: 1px solid #f3d58c;
-            border-left: 5px solid #d97706;
-            border-radius: 12px;
-            color: #7c3b07;
-            font-size: 13px;
-            line-height: 1.55;
-            box-shadow: 0 8px 18px rgba(217, 119, 6, 0.08);
-        ">
+        <div class="obra-note fx-rise fx-delay-1">
         <b>Datos 2013-2018.</b> Son los más recientes publicados por la CDMX con georreferencia
         completa. Fuente: <a href="https://datos.cdmx.gob.mx/dataset/rally-como-van-las-obras-cdmx"
         style="color:#7c3b07;text-decoration:underline;">Rally ¿Cómo van las obras? · Portal de Datos Abiertos CDMX</a>.
@@ -85,14 +138,14 @@ def _():
     FONT = "Sora, IBM Plex Sans, -apple-system, system-ui, sans-serif"
 
     RAMO_PALETTE = {
-        "Aportaciones Federales para Entidades Federativas y Municipios": "#9F2241",
-        "Provisiones Salariales y Económicas": "#EC6730",
-        "Comunicaciones y Transportes": "#00B7CD",
-        "Medio Ambiente y Recursos Naturales": "#00A489",
-        "Salud": "#E3007E",
-        "Educación Pública": "#6C4A7E",
-        "Gobernación": "#3D5A80",
-        "Cultura": "#D6A461",
+        "Aportaciones Federales para Entidades Federativas y Municipios": "#23395B",
+        "Provisiones Salariales y Económicas": "#2F6690",
+        "Comunicaciones y Transportes": "#3A7CA5",
+        "Medio Ambiente y Recursos Naturales": "#00A7A0",
+        "Salud": "#C94C4C",
+        "Educación Pública": "#6D597A",
+        "Gobernación": "#264653",
+        "Cultura": "#F4A259",
         "Desarrollo Agrario, Territorial y Urbano": "#2A9D8F",
     }
 
@@ -181,6 +234,24 @@ def _(mo, raw):
         label="Estatus",
     )
 
+    mo.md(
+        """
+        <div class="fx-card fx-rise fx-delay-1" style="
+            margin: 10px 0 12px;
+            padding: 12px 14px;
+            background: var(--surface-card);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            font-family: var(--font-body);
+        ">
+            <div style="font-size:11px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:8px;">
+                Filtros de exploración territorial
+            </div>
+        </div>
+        """
+    )
+
     mo.hstack(
         [alcaldia_filter, ramo_filter, ciclo_filter, status_filter],
         justify="start",
@@ -194,13 +265,14 @@ def _(mo, raw):
 def _(mo):
     mo.md(
         """
-        <div style="
+        <div class="fx-card fx-rise fx-delay-2" style="
             margin: 10px 0 14px;
             padding: 14px 16px;
-            background: #F8FAFC;
-            border: 1px solid #E2E8F0;
-            border-radius: 10px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-lg);
             color: #334155;
+            font-family: var(--font-body);
             font-size: 13px;
             line-height: 1.55;
         ">
@@ -245,25 +317,25 @@ def _(df, fmt_int, fmt_mxn, mo, pl):
 
     def _kpi(label, value, accent="#9F2241"):
         return f"""
-        <div style="
-            background: linear-gradient(170deg, #ffffff 0%, #f8fbff 100%);
-            border: 1px solid #dbe7f3;
+        <div class="fx-card" style="
+            background: var(--surface-card);
+            border: 1px solid var(--border-soft);
             border-top: 5px solid {accent};
-            border-radius: 14px;
+            border-radius: var(--radius-lg);
             padding: 20px 22px 18px;
             flex: 1;
             min-width: 180px;
-            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+            box-shadow: var(--shadow-card);
         ">
-            <div style="font-size:10px;color:#57657a;letter-spacing:1.35px;text-transform:uppercase;font-weight:700;">{label}</div>
-            <div style="font-size:30px;font-weight:800;color:#0F172A;margin-top:8px;letter-spacing:-0.7px;line-height:1.1;">{value}</div>
+            <div style="font-size:10px;color:var(--text-muted);letter-spacing:1.35px;text-transform:uppercase;font-weight:700;">{label}</div>
+            <div style="font-size:30px;font-weight:800;color:var(--text-strong);margin-top:8px;letter-spacing:-0.7px;line-height:1.1;">{value}</div>
         </div>
         """
 
     mo.md(f"""
     ## Acto 1 · Panorama general
 
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin:16px 0 22px;">
+    <div class="fx-rise fx-delay-2" style="display:flex;gap:14px;flex-wrap:wrap;margin:16px 0 22px;">
     {_kpi("Proyectos", fmt_int(_n), "#9F2241")}
     {_kpi("Inversión ejercida", fmt_mxn(_monto), "#00A489")}
     {_kpi("Ejecución presupuestal", _ejecucion, "#00B7CD")}
@@ -290,7 +362,7 @@ def _(mo):
 
 
 @app.cell
-def _(RAMO_PALETTE, df, fmt_int, fmt_mxn, go, mo, pl, px):
+def _(FONT, RAMO_PALETTE, df, fmt_int, fmt_mxn, go, mo, pl, px):
     import math
 
     _pdf = (
@@ -370,13 +442,18 @@ def _(RAMO_PALETTE, df, fmt_int, fmt_mxn, go, mo, pl, px):
             xanchor="left",
             x=0.01,
             bgcolor="rgba(255,255,255,0.92)",
-            bordercolor="#E2E8F0",
+            bordercolor="#dbe7f3",
             borderwidth=1,
-            font=dict(size=11, family="Inter"),
+            font=dict(size=11, family=FONT),
             title=dict(text="<b>Ramo federal</b>", font=dict(size=12)),
             itemsizing="constant",
         ),
         paper_bgcolor="white",
+        hoverlabel=dict(
+            bgcolor="#0f172a",
+            bordercolor="#334155",
+            font=dict(family=FONT, size=12, color="#f8fafc"),
+        ),
     )
 
     map_widget = mo.ui.plotly(_fig)
@@ -406,7 +483,7 @@ def _(df, fmt_int, fmt_mxn, map_widget, mo, pl):
     if not _selected_ids:
         mo.md(
             """
-            <div style="padding:24px;border:1.5px dashed #CBD5E1;border-radius:12px;
+            <div class="fx-rise" style="padding:24px;border:1.5px dashed #CBD5E1;border-radius:12px;
                         color:#64748B;text-align:center;background:#F8FAFC;">
                 👆 Haz clic en un punto del mapa para ver los detalles del proyecto.
             </div>
@@ -447,7 +524,7 @@ def _(df, fmt_int, fmt_mxn, map_widget, mo, pl):
             _justif_html = ""
 
         mo.md(f"""
-        <div style="
+        <div class="fx-card fx-rise" style="
             border:1px solid #E2E8F0; border-radius:14px; padding:24px 28px;
             background:white; box-shadow:0 2px 8px rgba(15,23,42,0.04);
         ">
@@ -513,7 +590,7 @@ def _(mo):
 
 
 @app.cell
-def _(alcaldia_filter, df, fmt_mxn, go, pl):
+def _(FONT, alcaldia_filter, df, fmt_mxn, go, pl):
     _alc = (
         df.group_by("desc_alcaldia")
         .agg(
@@ -531,10 +608,10 @@ def _(alcaldia_filter, df, fmt_mxn, go, pl):
 
     _selected = set(alcaldia_filter.value or [])
     _colors = [
-        "#9F2241" if a in _selected else "#E2E8F0" for a in _alc["desc_alcaldia"]
+        "#2F6690" if a in _selected else "#dbe7f3" for a in _alc["desc_alcaldia"]
     ]
     if not _selected:
-        _colors = ["#9F2241"] * len(_alc)
+        _colors = ["#2F6690"] * len(_alc)
 
     _fig = go.Figure(
         go.Bar(
@@ -553,11 +630,16 @@ def _(alcaldia_filter, df, fmt_mxn, go, pl):
     _fig.update_layout(
         height=max(300, 28 * len(_alc) + 40),
         margin=dict(l=10, r=60, t=10, b=30),
-        xaxis=dict(showgrid=True, gridcolor="#F1F5F9", tickformat=".2s", title=""),
+        xaxis=dict(showgrid=True, gridcolor="#e8eff7", tickformat=".2s", title=""),
         yaxis=dict(title="", tickfont=dict(size=12)),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, system-ui, sans-serif", size=12, color="#1E293B"),
+        font=dict(family=FONT, size=12, color="#1E293B"),
+        hoverlabel=dict(
+            bgcolor="#0f172a",
+            bordercolor="#334155",
+            font=dict(family=FONT, size=12, color="#f8fafc"),
+        ),
     )
     _fig
     return
@@ -605,7 +687,7 @@ def _(df, fmt_int, fmt_mxn, mo, pl):
 
         def _card(emoji, title, body, tone="#0F172A"):
             return f"""
-            <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;padding:18px 20px;flex:1;min-width:240px;">
+            <div class="fx-card" style="background:white;border:1px solid #E2E8F0;border-radius:12px;padding:18px 20px;flex:1;min-width:240px;">
                 <div style="font-size:22px;">{emoji}</div>
                 <div style="font-size:11px;letter-spacing:1.2px;color:#64748B;text-transform:uppercase;font-weight:600;margin-top:6px;">{title}</div>
                 <div style="font-size:14px;color:{tone};margin-top:6px;line-height:1.45;">{body}</div>
@@ -655,7 +737,7 @@ def _(df, fmt_int, fmt_mxn, mo, pl):
             )
 
         mo.md(
-            f'<div style="display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 24px;">{"".join(_cards)}</div>'
+            f'<div class="fx-rise" style="display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 24px;">{"".join(_cards)}</div>'
         )
     return
 

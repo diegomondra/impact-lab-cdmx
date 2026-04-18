@@ -12,34 +12,62 @@ app = marimo.App(
 def _(mo):
     mo.md(
         """
-        <div style="
-            padding: 36px 40px 28px;
-            background: linear-gradient(135deg, #9F2241 0%, #691C32 100%);
-            color: white;
-            border-radius: 14px;
-            margin-bottom: 8px;
-            box-shadow: 0 8px 24px rgba(159, 34, 65, 0.25);
-        ">
-        <div style="font-size: 13px; letter-spacing: 3px; opacity: 0.85; text-transform: uppercase; font-weight: 600;">
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+        .civic-hero {
+            font-family: 'Sora', 'IBM Plex Sans', sans-serif;
+            padding: 40px 44px 34px;
+            background:
+                radial-gradient(1200px 220px at 80% -20%, rgba(254, 205, 96, 0.22), transparent 60%),
+                linear-gradient(120deg, #0f1b2e 0%, #1b2f4c 42%, #243d63 100%);
+            color: #f8fafc;
+            border-radius: 20px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 20px 50px rgba(10, 19, 32, 0.34);
+            position: relative;
+            overflow: hidden;
+        }
+        .civic-hero:after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+            background-size: 26px 26px;
+            opacity: 0.2;
+            pointer-events: none;
+        }
+        .civic-hero * {
+            position: relative;
+            z-index: 1;
+        }
+        </style>
+
+        <div class="civic-hero">
+        <div style="font-size: 12px; letter-spacing: 2.8px; opacity: 0.85; text-transform: uppercase; font-weight: 700; color:#ffd98a;">
             Ciudad de México · Presupuesto de Egresos
         </div>
-        <div style="font-size: 38px; font-weight: 700; margin-top: 6px; letter-spacing: -0.5px;">
-            ¿A dónde va el dinero público?
+        <div style="font-size: 41px; font-weight: 800; margin-top: 8px; letter-spacing: -0.9px; line-height:1.12; max-width: 900px;">
+            Del presupuesto en papel al gasto real
         </div>
-        <div style="font-size: 15px; margin-top: 10px; opacity: 0.9; max-width: 780px; line-height: 1.55;">
-            Explora cómo se asigna cada peso del presupuesto de la CDMX. Datos oficiales del
-            <a href="https://datos.cdmx.gob.mx" style="color:#FFCCD5; text-decoration: underline;">Portal de Datos Abiertos</a>.
+        <div style="font-family:'IBM Plex Sans', sans-serif; font-size: 15px; margin-top: 12px; opacity: 0.96; max-width: 840px; line-height: 1.65; color:#dbe7fb;">
+            Este tablero revela cómo se prioriza y ejecuta el dinero público de la CDMX.
+            Combina cortes históricos comparables y referencia reciente usando datos oficiales del
+            <a href="https://datos.cdmx.gob.mx" style="color:#ffe6b4; text-decoration: underline;">Portal de Datos Abiertos</a>.
         </div>
         </div>
+
         <div style="
-            margin: 8px 0 20px;
-            padding: 12px 18px;
-            background: #FEF3C7;
-            border-left: 4px solid #D97706;
-            border-radius: 8px;
-            color: #78350F;
+            margin: 10px 0 20px;
+            padding: 14px 18px;
+            background: linear-gradient(120deg, #fff9e8 0%, #fff3d5 100%);
+            border: 1px solid #f3d58c;
+            border-left: 5px solid #d97706;
+            border-radius: 12px;
+            color: #7c3b07;
             font-size: 13px;
-            line-height: 1.5;
+            line-height: 1.55;
+            box-shadow: 0 8px 18px rgba(217, 119, 6, 0.08);
         ">
         <b>Alineación temporal del análisis.</b> Para mantener comparabilidad con el mapa de obra
         georreferenciada (2013-2018), este tablero prioriza los cortes 2018-2019 y conserva
@@ -73,7 +101,7 @@ def _():
         "#2A9D8F",
     ]
 
-    FONT = "Inter, -apple-system, system-ui, sans-serif"
+    FONT = "Sora, IBM Plex Sans, -apple-system, system-ui, sans-serif"
 
     def fmt_mxn(v, short=True):
         if v is None:
@@ -233,17 +261,17 @@ def _(budget_label, df, fmt_mxn, has_spent, mo):
         )
         return f"""
         <div style="
-            background: white;
-            border: 1px solid #E2E8F0;
-            border-left: 4px solid {accent};
-            border-radius: 10px;
-            padding: 20px 22px;
+            background: linear-gradient(170deg, #ffffff 0%, #f8fbff 100%);
+            border: 1px solid #dbe7f3;
+            border-top: 5px solid {accent};
+            border-radius: 14px;
+            padding: 20px 22px 18px;
             flex: 1;
             min-width: 200px;
-            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
         ">
-            <div style="font-size:11px;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;">{label}</div>
-            <div style="font-size:28px;font-weight:700;color:#0F172A;margin-top:8px;letter-spacing:-0.5px;">{value}</div>
+            <div style="font-size:10px;color:#57657a;letter-spacing:1.35px;text-transform:uppercase;font-weight:700;">{label}</div>
+            <div style="font-size:30px;font-weight:800;color:#0F172A;margin-top:8px;letter-spacing:-0.7px;line-height:1.1;">{value}</div>
             {_sub_html}
         </div>
         """

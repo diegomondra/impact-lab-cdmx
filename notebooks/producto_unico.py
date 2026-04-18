@@ -419,8 +419,8 @@ def _(budget_df, fmt_mxn, go, pl, style_fig):
         .reset_index(drop=True)
     )
 
-    fig = go.Figure()
-    fig.add_trace(
+    _fig_budget = go.Figure()
+    _fig_budget.add_trace(
         go.Bar(
             y=top["desc_funcion"],
             x=top["budget"],
@@ -432,7 +432,7 @@ def _(budget_df, fmt_mxn, go, pl, style_fig):
         )
     )
 
-    fig.add_trace(
+    _fig_budget.add_trace(
         go.Bar(
             y=top["desc_funcion"],
             x=top["spent"],
@@ -444,15 +444,15 @@ def _(budget_df, fmt_mxn, go, pl, style_fig):
         )
     )
 
-    fig.update_layout(
+    _fig_budget.update_layout(
         barmode="overlay",
         bargap=0.35,
         xaxis=dict(showgrid=True, gridcolor="#F1F5F9", tickformat=".2s", title=""),
         yaxis=dict(title="", tickfont=dict(size=12), automargin=True),
         legend=dict(orientation="h", y=1.02, x=0),
     )
-    style_fig(fig, height=560)
-    fig
+    style_fig(_fig_budget, height=560)
+    _fig_budget
     return
 
 
@@ -509,7 +509,7 @@ def _(RAMO_PALETTE, FONT, fmt_mxn, mo, obra_df, px):
     ramos_present = sorted(pdf["desc_ramo"].unique())
     color_seq = [RAMO_PALETTE.get(r, "#94A3B8") for r in ramos_present]
 
-    fig = px.scatter_map(
+    _fig_map = px.scatter_map(
         pdf,
         lat="latitud",
         lon="longitud",
@@ -523,8 +523,8 @@ def _(RAMO_PALETTE, FONT, fmt_mxn, mo, obra_df, px):
         map_style="carto-positron",
         opacity=0.74,
     )
-    fig.update_traces(hovertemplate="%{customdata[0]}<extra></extra>")
-    fig.update_layout(
+    _fig_map.update_traces(hovertemplate="%{customdata[0]}<extra></extra>")
+    _fig_map.update_layout(
         height=620,
         margin=dict(l=0, r=0, t=0, b=0),
         legend=dict(
@@ -547,7 +547,7 @@ def _(RAMO_PALETTE, FONT, fmt_mxn, mo, obra_df, px):
             font=dict(family=FONT, size=12, color="#f8fafc"),
         ),
     )
-    mo.ui.plotly(fig)
+    mo.ui.plotly(_fig_map)
     return
 
 
@@ -570,7 +570,7 @@ def _(FONT, fmt_mxn, go, obra_df, pl):
     alc["desc_alcaldia"] = alc["desc_alcaldia"].fillna("Sin alcaldia")
     alc["label"] = alc["monto"].apply(fmt_mxn)
 
-    fig = go.Figure(
+    _fig_alcaldia = go.Figure(
         go.Bar(
             x=alc["monto"],
             y=alc["desc_alcaldia"],
@@ -584,7 +584,7 @@ def _(FONT, fmt_mxn, go, obra_df, pl):
             cliponaxis=False,
         )
     )
-    fig.update_layout(
+    _fig_alcaldia.update_layout(
         height=420,
         margin=dict(l=10, r=60, t=20, b=20),
         xaxis=dict(showgrid=True, gridcolor="#e8eff7", tickformat=".2s", title=""),
@@ -598,7 +598,7 @@ def _(FONT, fmt_mxn, go, obra_df, pl):
             font=dict(family=FONT, size=12, color="#f8fafc"),
         ),
     )
-    fig
+    _fig_alcaldia
     return
 
 

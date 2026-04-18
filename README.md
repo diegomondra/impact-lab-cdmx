@@ -17,13 +17,13 @@ The project uses official datasets from [datos.cdmx.gob.mx](https://datos.cdmx.g
 
 ## Narrative flow
 
-The two main dashboards now follow the same storytelling structure:
+The primary deliverable (`notebooks/producto_unico.py`) follows a single storytelling arc:
 
-1. **Act 1 · Panorama**: what is being allocated/executed at high level.
-2. **Act 2 · Evidence**: where spending lands (functions, agencies, map, territory).
-3. **Act 3 · Focus**: key findings and targeted lookup for accountability questions.
+1. **Act 1 · Panorama integrado**: budget and execution at high level.
+2. **Act 2 · Presupuesto**: where money is allocated and spent by function.
+3. **Act 3 · Territorio**: where projects land in the city with georeferenced evidence.
 
-This makes demo and analysis consistent across budget and infrastructure views.
+This keeps demo and analysis in one coherent product.
 
 ---
 
@@ -51,13 +51,14 @@ To run a different dashboard, swap the last line:
 
 ```bash
 uv run marimo run notebooks/budget_dashboard.py
+uv run marimo run notebooks/obra_map.py
 uv run marimo run notebooks/explore.py
 ```
 
 ### Edit mode (live-coding)
 
 ```bash
-uv run marimo edit notebooks/obra_map.py
+uv run marimo edit notebooks/producto_unico.py
 ```
 
 Changes to the code re-run reactively in the browser. This is how you iterate on the dashboard.
@@ -65,7 +66,7 @@ Changes to the code re-run reactively in the browser. This is how you iterate on
 ### Port already in use?
 
 ```bash
-uv run marimo run notebooks/obra_map.py --port 2719
+uv run marimo run notebooks/producto_unico.py --port 2719
 ```
 
 ---
@@ -97,6 +98,7 @@ uv run marimo new notebooks/my_analysis.py
 .
 ├── data/                           # CSVs (gitignored — run scripts/download_data.sh)
 ├── notebooks/
+│   ├── producto_unico.py           # Single integrated deliverable (budget + territory)
 │   ├── obra_map.py                 # Map of federal projects in CDMX
 │   ├── budget_dashboard.py         # Budget dashboard aligned to 2018-2019 narrative
 │   └── explore.py                  # Generic CSV explorer
@@ -110,10 +112,10 @@ uv run marimo new notebooks/my_analysis.py
 
 ## Demo script (3-5 min)
 
-1. Open `notebooks/budget_dashboard.py` and select a 2018 or 2019 cut.
-2. Walk through Act 1 and Act 2 to show allocation vs execution and concentration by agency.
-3. Switch to `notebooks/obra_map.py` and connect that spending to territorial evidence.
-4. Close with Act 3 sections in both dashboards to highlight follow-up questions.
+1. Open `notebooks/producto_unico.py` and select a 2018 or 2019 budget cut.
+2. In Act 1, explain the integrated KPI story (budget + execution + project progress).
+3. In Act 2, show concentration by budget function and execution gap.
+4. In Act 3, connect the same story to map evidence and territorial distribution.
 
 ---
 

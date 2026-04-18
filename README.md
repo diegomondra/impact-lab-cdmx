@@ -2,13 +2,27 @@
 
 Interactive dashboards for Ciudad de México public data — built at Claude Mexico City Lab 2026.
 
-Three dashboards tell three stories with official data from [datos.cdmx.gob.mx](https://datos.cdmx.gob.mx):
+Follow public money from budget lines to projects on the street.
 
-| Dashboard | Story | Source |
+The project uses official datasets from [datos.cdmx.gob.mx](https://datos.cdmx.gob.mx) and is now explicitly aligned around **2018-2019** for cross-dashboard comparability:
+
+|Dashboard|Story|Source|
 |---|---|---|
-| `notebooks/obra_map.py` | *¿Qué se construyó en tu calle?* — 23k georeferenced federal projects (2013–2018). Click any dot to see cost flow, beneficiaries, contractor, and contract PDF. | Rally ¿Cómo van las obras? |
-| `notebooks/budget_dashboard.py` | *¿A dónde va el dinero público?* — CDMX budget by purpose, agency, SDG, and chapter. Plan-vs-actual execution view. | Presupuesto de egresos 2023/2024 |
-| `notebooks/explore.py` | Generic CSV explorer — drop any CSV into `data/` and get instant charts. | — |
+|`notebooks/obra_map.py`|*¿Qué se construyó en tu calle?* — 23k georeferenced federal projects (2013-2018). Includes execution, completion, contractor, and territorial distribution.|Rally ¿Cómo van las obras?|
+|`notebooks/budget_dashboard.py`|*¿A dónde va el dinero público?* — budget allocation and execution by function, agency, SDG, and spending chapter. Prioritizes 2018-2019 cuts (with 2023-2024 as recent reference).|Presupuesto de egresos 2018/2019/2023/2024|
+|`notebooks/explore.py`|Generic CSV explorer — drop any CSV into `data/` and get instant charts.|—|
+
+---
+
+## Narrative flow
+
+The two main dashboards now follow the same storytelling structure:
+
+1. **Act 1 · Panorama**: what is being allocated/executed at high level.
+2. **Act 2 · Evidence**: where spending lands (functions, agencies, map, territory).
+3. **Act 3 · Focus**: key findings and targeted lookup for accountability questions.
+
+This makes demo and analysis consistent across budget and infrastructure views.
 
 ---
 
@@ -26,11 +40,11 @@ You don't need to install Python yourself — `uv` handles that.
 git clone git@github.com:diegomondra/impact-lab-cdmx.git
 cd impact-lab-cdmx
 uv sync                              # installs Python + all deps (~30s first time)
-bash scripts/download_data.sh        # downloads ~85MB of CDMX open data
+bash scripts/download_data.sh        # downloads ~290MB of CDMX open data
 uv run marimo run notebooks/obra_map.py
 ```
 
-Browser opens at **http://localhost:2718**.
+Browser opens at **<http://localhost:2718>**.
 
 To run a different dashboard, swap the last line:
 
@@ -78,18 +92,27 @@ uv run marimo new notebooks/my_analysis.py
 
 ## Project structure
 
-```
+```text
 .
 ├── data/                           # CSVs (gitignored — run scripts/download_data.sh)
 ├── notebooks/
 │   ├── obra_map.py                 # Map of federal projects in CDMX
-│   ├── budget_dashboard.py         # CDMX budget allocation dashboard
+│   ├── budget_dashboard.py         # Budget dashboard aligned to 2018-2019 narrative
 │   └── explore.py                  # Generic CSV explorer
 ├── scripts/
-│   └── download_data.sh            # Fetches CDMX open data (~85MB)
+│   └── download_data.sh            # Fetches CDMX open data (~290MB)
 ├── pyproject.toml                  # Dependencies + marimo config
 └── README.md
 ```
+
+---
+
+## Demo script (3-5 min)
+
+1. Open `notebooks/budget_dashboard.py` and select a 2018 or 2019 cut.
+2. Walk through Act 1 and Act 2 to show allocation vs execution and concentration by agency.
+3. Switch to `notebooks/obra_map.py` and connect that spending to territorial evidence.
+4. Close with Act 3 sections in both dashboards to highlight follow-up questions.
 
 ---
 

@@ -1,6 +1,23 @@
 # impact-lab-cdmx
 
-Quick CSV data exploration and beautiful visualizations. Built for fast iteration: drop a CSV into `data/`, open a Marimo notebook, and get interactive Plotly/Altair charts.
+Interactive dashboards for CDMX public data. Built at Claude Mexico City Lab 2026.
+
+## Dashboards
+
+- **`notebooks/budget_dashboard.py`** — *¿A dónde va el dinero público?* Budget allocation by purpose, agency, SDG alignment, and economic classification. Data from [datos.cdmx.gob.mx](https://datos.cdmx.gob.mx).
+- **`notebooks/explore.py`** — Generic CSV explorer for any dataset dropped into `data/`.
+
+## Quick start
+
+```bash
+uv sync                                 # install deps
+bash scripts/download_data.sh           # fetch CDMX budget CSVs (~50MB)
+uv run marimo run notebooks/budget_dashboard.py   # app mode
+# or
+uv run marimo edit notebooks/budget_dashboard.py  # reactive editing
+```
+
+Browser opens at `http://localhost:2718`.
 
 ## Stack
 
@@ -48,9 +65,12 @@ uv run marimo new notebooks/my_analysis.py
 
 ```
 .
-├── data/              # CSVs (gitignored)
-├── notebooks/         # Marimo notebooks (.py files, git-friendly)
-│   └── explore.py     # Starter notebook
-├── pyproject.toml     # Dependencies
+├── data/                       # CSVs (gitignored — run scripts/download_data.sh)
+├── notebooks/
+│   ├── budget_dashboard.py     # CDMX budget allocation dashboard
+│   └── explore.py              # Generic CSV explorer
+├── scripts/
+│   └── download_data.sh        # Fetches CDMX datasets
+├── pyproject.toml
 └── README.md
 ```

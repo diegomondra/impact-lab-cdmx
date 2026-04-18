@@ -1,29 +1,26 @@
 # impact-lab-cdmx
 
-Interactive dashboards for Ciudad de México public data — built at Claude Mexico City Lab 2026.
+Single integrated dashboard for Ciudad de Mexico public data, built at Claude Mexico City Lab 2026.
 
-Follow public money from budget lines to projects on the street.
+Follow public money from budget lines to projects on the street in one product.
 
-The project uses official datasets from [datos.cdmx.gob.mx](https://datos.cdmx.gob.mx) and is now explicitly aligned around **2018-2019** for cross-dashboard comparability:
+Primary deliverable:
 
-|Dashboard|Story|Source|
+|Product|Story|Source|
 |---|---|---|
-|`notebooks/producto_unico.py`|*Producto único integrado* — una sola experiencia con presupuesto + obra pública para demo y entrega final.|Presupuesto CDMX + Rally ¿Cómo van las obras?|
-|`notebooks/obra_map.py`|*¿Qué se construyó en tu calle?* — 23k georeferenced federal projects (2013-2018). Includes execution, completion, contractor, and territorial distribution.|Rally ¿Cómo van las obras?|
-|`notebooks/budget_dashboard.py`|*¿A dónde va el dinero público?* — budget allocation and execution by function, agency, SDG, and spending chapter. Prioritizes 2018-2019 cuts (with 2023-2024 as recent reference).|Presupuesto de egresos 2018/2019/2023/2024|
-|`notebooks/explore.py`|Generic CSV explorer — drop any CSV into `data/` and get instant charts.|—|
+|`notebooks/producto_unico.py`|Producto unico integrado: presupuesto + obra publica en una sola experiencia.|Presupuesto CDMX + Rally ¿Como van las obras?|
 
 ---
 
 ## Narrative flow
 
-The primary deliverable (`notebooks/producto_unico.py`) follows a single storytelling arc:
+The deliverable follows one storytelling arc:
 
 1. **Act 1 · Panorama integrado**: budget and execution at high level.
 2. **Act 2 · Presupuesto**: where money is allocated and spent by function.
 3. **Act 3 · Territorio**: where projects land in the city with georeferenced evidence.
 
-This keeps demo and analysis in one coherent product.
+This keeps demo and analysis in one coherent product and avoids switching between notebooks.
 
 ---
 
@@ -47,14 +44,6 @@ uv run marimo run notebooks/producto_unico.py
 
 Browser opens at **<http://localhost:2718>**.
 
-To run a different dashboard, swap the last line:
-
-```bash
-uv run marimo run notebooks/budget_dashboard.py
-uv run marimo run notebooks/obra_map.py
-uv run marimo run notebooks/explore.py
-```
-
 ### Edit mode (live-coding)
 
 ```bash
@@ -75,7 +64,7 @@ uv run marimo run notebooks/producto_unico.py --port 2719
 
 Drop a CSV into `data/`. Everything in `data/` is gitignored except the README, so sensitive files stay local.
 
-Open `notebooks/explore.py` and pick your file from the dropdown.
+Open `notebooks/explore.py` and pick your file from the dropdown (optional support tool).
 
 ## New notebook from scratch
 
@@ -99,9 +88,9 @@ uv run marimo new notebooks/my_analysis.py
 ├── data/                           # CSVs (gitignored — run scripts/download_data.sh)
 ├── notebooks/
 │   ├── producto_unico.py           # Single integrated deliverable (budget + territory)
-│   ├── obra_map.py                 # Map of federal projects in CDMX
-│   ├── budget_dashboard.py         # Budget dashboard aligned to 2018-2019 narrative
-│   └── explore.py                  # Generic CSV explorer
+│   ├── budget_dashboard.py         # Legacy/support notebook
+│   ├── obra_map.py                 # Legacy/support notebook
+│   └── explore.py                  # Optional generic CSV explorer
 ├── scripts/
 │   └── download_data.sh            # Fetches CDMX open data (~290MB)
 ├── pyproject.toml                  # Dependencies + marimo config
@@ -117,6 +106,10 @@ uv run marimo new notebooks/my_analysis.py
 3. In Act 2, show concentration by budget function and execution gap.
 4. In Act 3, connect the same story to map evidence and territorial distribution.
 
+## Legacy notebooks
+
+`notebooks/budget_dashboard.py` and `notebooks/obra_map.py` are kept for backward compatibility and reference. The official deliverable for evaluation is `notebooks/producto_unico.py`.
+
 ---
 
 ## Troubleshooting
@@ -127,7 +120,7 @@ uv run marimo new notebooks/my_analysis.py
 
 **Output is too large error** — the map renders 23k points. The `output_max_bytes` cap is set in `pyproject.toml`. If you hit it, raise the value or add a filter to reduce points.
 
-**Data looks old** — the Rally dataset (obra_map.py) covers 2013–2018; this is what CDMX publishes with georeferencing. The dashboard banner makes this explicit.
+**Data looks old** — the Rally dataset used in the integrated product covers 2013–2018; this is what CDMX publishes with georeferencing.
 
 ---
 

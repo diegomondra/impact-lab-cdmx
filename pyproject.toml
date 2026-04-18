@@ -1,7 +1,7 @@
 [project]
 name = "impact-lab-cdmx"
 version = "0.1.0"
-description = "Quick CSV data exploration and beautiful visualizations"
+description = "Single integrated CDMX transparency dashboard: budget plus georeferenced public works"
 requires-python = ">=3.11"
 dependencies = [
     "marimo>=0.10.0",

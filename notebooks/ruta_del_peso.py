@@ -1020,7 +1020,7 @@ def _(
     </div>
     """)
 
-    act_flujo_content = mo.vstack([_hero, mo.ui.plotly(_fig_sk)])
+    act_flujo_content = mo.vstack([_hero, _fig_sk])
     return (act_flujo_content,)
 
 

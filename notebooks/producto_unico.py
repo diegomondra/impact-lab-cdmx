@@ -327,10 +327,13 @@ def _(budget_datasets, pl, year_picker):
     budget_df = budget_datasets[year_picker.value]
 
     mod_sum = budget_df["monto_modificado"].fill_null(0).sum()
+    spent_sum = budget_df["monto_ejercido"].fill_null(0).sum()
     if mod_sum > 0:
         budget_col, budget_label = "monto_modificado", "Modificado"
     else:
         budget_col, budget_label = "monto_aprobado", "Aprobado"
+
+    has_spent = spent_sum > 0
 
     budget_df = budget_df.with_columns(
         [
@@ -341,7 +344,7 @@ def _(budget_datasets, pl, year_picker):
     budget_df = budget_df.with_columns(
         pl.max_horizontal([pl.col("_budget"), pl.col("_spent")]).alias("_amount")
     ).filter(pl.col("_amount") > 0)
-    return budget_col, budget_df, budget_label
+    return budget_col, budget_df, budget_label, has_spent
 
 
 @app.cell
@@ -353,10 +356,12 @@ def _(alcaldia_filter, ciclo_filter, pl, raw_obras):
 
 
 @app.cell(hide_code=True)
-def _(budget_df, budget_label, fmt_int, fmt_mxn, mo, obra_df, pl):
+def _(budget_df, budget_label, fmt_int, fmt_mxn, has_spent, mo, obra_df, pl):
     budget_total = budget_df["_budget"].sum()
     spent_total = budget_df["_spent"].sum()
-    exec_rate = (spent_total / budget_total * 100) if budget_total > 0 else None
+    exec_rate = (
+        (spent_total / budget_total * 100) if has_spent and budget_total > 0 else None
+    )
 
     obras_total = obra_df.height
     obras_monto = obra_df["monto_ejercido"].sum()
@@ -377,7 +382,7 @@ def _(budget_df, budget_label, fmt_int, fmt_mxn, mo, obra_df, pl):
 
         <div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0 22px;">
             {kpi(f"Presupuesto {budget_label.lower()}", fmt_mxn(budget_total), "chip-budget")}
-            {kpi("Ejecucion presupuestal", f"{exec_rate:.1f}%" if exec_rate is not None else "-", "chip-budget")}
+            {kpi("Ejecucion presupuestal", f"{exec_rate:.1f}%" if exec_rate is not None else "No disponible", "chip-budget")}
             {kpi("Proyectos de obra", fmt_int(obras_total), "chip-obra")}
             {kpi("Inversion en obra", fmt_mxn(obras_monto), "chip-obra")}
             {kpi("Obras terminadas", f"{obras_done_rate:.1f}%", "chip-obra")}
@@ -388,13 +393,18 @@ def _(budget_df, budget_label, fmt_int, fmt_mxn, mo, obra_df, pl):
 
 
 @app.cell(hide_code=True)
-def _(budget_label, mo):
+def _(budget_label, has_spent, mo):
+    _copy = (
+        f"Top funciones por presupuesto <b>{budget_label.lower()}</b> y comparacion contra lo ejercido."
+        if has_spent
+        else f"Top funciones por presupuesto <b>{budget_label.lower()}</b>. Este corte no incluye ejercicio reportado."
+    )
     mo.md(
         f"""
         ## Acto 2 · Presupuesto
 
         <div class="card" style="margin: 6px 0 12px; font-family: var(--font-body); font-size: 13px; color: var(--text-muted); line-height: 1.55;">
-            Top funciones por presupuesto <b>{budget_label.lower()}</b> y comparacion contra lo ejercido.
+            {_copy}
         </div>
         """
     )
@@ -402,7 +412,7 @@ def _(budget_label, mo):
 
 
 @app.cell
-def _(budget_df, fmt_mxn, go, pl, style_fig):
+def _(budget_df, fmt_mxn, go, has_spent, pl, style_fig):
     top = (
         budget_df.with_columns(pl.col("desc_funcion").fill_null("Sin clasificar"))
         .group_by("desc_funcion")
@@ -432,17 +442,18 @@ def _(budget_df, fmt_mxn, go, pl, style_fig):
         )
     )
 
-    _fig_budget.add_trace(
-        go.Bar(
-            y=top["desc_funcion"],
-            x=top["spent"],
-            orientation="h",
-            marker=dict(color="#9F2241"),
-            name="Ejercido",
-            hovertemplate="<b>%{y}</b><br>Ejercido: %{customdata}<extra></extra>",
-            customdata=[fmt_mxn(v) for v in top["spent"]],
+    if has_spent:
+        _fig_budget.add_trace(
+            go.Bar(
+                y=top["desc_funcion"],
+                x=top["spent"],
+                orientation="h",
+                marker=dict(color="#9F2241"),
+                name="Ejercido",
+                hovertemplate="<b>%{y}</b><br>Ejercido: %{customdata}<extra></extra>",
+                customdata=[fmt_mxn(v) for v in top["spent"]],
+            )
         )
-    )
 
     _fig_budget.update_layout(
         barmode="overlay",

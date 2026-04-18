@@ -8,6 +8,14 @@ cd "$(dirname "$0")/.."
 mkdir -p data
 cd data
 
+echo "Downloading 2018 approved budget..."
+curl -sSL -o egresos_2018_aprobado.csv \
+  "https://datos.cdmx.gob.mx/dataset/7a8820f2-3bea-4c69-8b20-1d01b1a99a6a/resource/5b20655c-072f-4347-baee-ab93d930b27b/download/egresos_2018_aprobado.csv"
+
+echo "Downloading 2018 public account (actual spending)..."
+curl -sSL -o egresos_2018_cp.csv \
+  "https://datos.cdmx.gob.mx/dataset/7a8820f2-3bea-4c69-8b20-1d01b1a99a6a/resource/1ea90350-d41d-48ae-b848-613490d6e16c/download/egresos_2018_cp.csv"
+
 echo "Downloading 2024 approved budget..."
 curl -sSL -o egresos_2024_aprobado.csv \
   "https://datos.cdmx.gob.mx/dataset/3a6cba97-adb1-4f35-9df1-984cc3657aca/resource/7fa1da81-531c-477c-93db-7580bc1c7ad0/download/egresos_2024_aprobado.csv"

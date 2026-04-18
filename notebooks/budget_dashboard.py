@@ -47,8 +47,16 @@ def _():
     DATA_DIR = Path(__file__).parent.parent / "data"
 
     PALETTE = [
-        "#9F2241", "#E3007E", "#EC6730", "#00A489", "#00B7CD",
-        "#6C4A7E", "#D6A461", "#3D5A80", "#C14953", "#2A9D8F",
+        "#9F2241",
+        "#E3007E",
+        "#EC6730",
+        "#00A489",
+        "#00B7CD",
+        "#6C4A7E",
+        "#D6A461",
+        "#3D5A80",
+        "#C14953",
+        "#2A9D8F",
     ]
 
     FONT = "Inter, -apple-system, system-ui, sans-serif"
@@ -61,11 +69,11 @@ def _():
         v = abs(v)
         if short:
             if v >= 1e9:
-                return f"{sign}${v/1e9:,.2f} mmdp"
+                return f"{sign}${v / 1e9:,.2f} mmdp"
             if v >= 1e6:
-                return f"{sign}${v/1e6:,.1f} mdp"
+                return f"{sign}${v / 1e6:,.1f} mdp"
             if v >= 1e3:
-                return f"{sign}${v/1e3:,.1f} k"
+                return f"{sign}${v / 1e3:,.1f} k"
             return f"{sign}${v:,.0f}"
         return f"{sign}${v:,.0f}"
 
@@ -84,8 +92,11 @@ def _():
             title=dict(
                 text=title,
                 font=dict(size=16, color="#0F172A", family=FONT),
-                x=0.01, xanchor="left",
-            ) if title else None,
+                x=0.01,
+                xanchor="left",
+            )
+            if title
+            else None,
         )
         return fig
 
@@ -100,10 +111,16 @@ def _(DATA_DIR, pl):
             infer_schema_length=10_000,
             null_values=["NA", ""],
             truncate_ragged_lines=True,
-            schema_overrides={"monto_aprobado": pl.Float64, "monto_modificado": pl.Float64, "monto_ejercido": pl.Float64},
+            schema_overrides={
+                "monto_aprobado": pl.Float64,
+                "monto_modificado": pl.Float64,
+                "monto_ejercido": pl.Float64,
+            },
         )
 
     files = {
+        "2018 · aprobado": DATA_DIR / "egresos_2018_aprobado.csv",
+        "2018 · cuenta pública": DATA_DIR / "egresos_2018_cp.csv",
         "2023 Q3 · avance trimestral": DATA_DIR / "egresos_2023_03_trimestre.csv",
         "2024 · aprobado": DATA_DIR / "egresos_2024_aprobado.csv",
         "2023 · aprobado": DATA_DIR / "egresos_2023_aprobado.csv",
@@ -139,10 +156,12 @@ def _(datasets, pl, year_picker):
 
     has_spent = _ejr_sum > 0
 
-    df = df.with_columns([
-        pl.col(budget_col).fill_null(0).alias("_budget"),
-        pl.col("monto_ejercido").fill_null(0).alias("_spent"),
-    ])
+    df = df.with_columns(
+        [
+            pl.col(budget_col).fill_null(0).alias("_budget"),
+            pl.col("monto_ejercido").fill_null(0).alias("_spent"),
+        ]
+    )
     df = df.with_columns(
         pl.max_horizontal([pl.col("_budget"), pl.col("_spent")]).alias("_amount")
     )
@@ -158,10 +177,18 @@ def _(budget_label, df, fmt_mxn, has_spent, mo):
     _n_programs = df["desc_programa_presupuestario"].n_unique()
     _n_agencies = df["desc_unidad_responsable"].n_unique()
 
-    _exec_rate = (_spent_total / _budget_total * 100) if has_spent and _budget_total > 0 else None
+    _exec_rate = (
+        (_spent_total / _budget_total * 100)
+        if has_spent and _budget_total > 0
+        else None
+    )
 
     def _kpi(label, value, accent="#9F2241", sub=None):
-        _sub_html = f'<div style="font-size:11px;color:#64748B;margin-top:4px;letter-spacing:0.5px;text-transform:uppercase;">{sub}</div>' if sub else ""
+        _sub_html = (
+            f'<div style="font-size:11px;color:#64748B;margin-top:4px;letter-spacing:0.5px;text-transform:uppercase;">{sub}</div>'
+            if sub
+            else ""
+        )
         return f"""
         <div style="
             background: white;
@@ -184,11 +211,20 @@ def _(budget_label, df, fmt_mxn, has_spent, mo):
     ]
     if has_spent:
         _cards.append(_kpi("Ejercido a la fecha", fmt_mxn(_spent_total), "#00A489"))
-        _cards.append(_kpi("Tasa de ejecución", f"{_exec_rate:.1f}%", "#6C4A7E", sub=f"ejercido / {budget_label.lower()}"))
+        _cards.append(
+            _kpi(
+                "Tasa de ejecución",
+                f"{_exec_rate:.1f}%",
+                "#6C4A7E",
+                sub=f"ejercido / {budget_label.lower()}",
+            )
+        )
     _cards.append(_kpi("Unidades responsables", f"{_n_agencies:,}", "#00B7CD"))
     _cards.append(_kpi("Programas presupuestarios", f"{_n_programs:,}", "#EC6730"))
 
-    mo.md(f'<div style="display:flex;gap:14px;flex-wrap:wrap;margin:16px 0 24px;">{"".join(_cards)}</div>')
+    mo.md(
+        f'<div style="display:flex;gap:14px;flex-wrap:wrap;margin:16px 0 24px;">{"".join(_cards)}</div>'
+    )
     return
 
 
@@ -215,17 +251,21 @@ def _(df, fmt_mxn, go, has_spent, pl, style_fig):
     _top = (
         df.with_columns(pl.col("desc_funcion").fill_null("Sin clasificar"))
         .group_by("desc_funcion")
-        .agg([
-            pl.col("_budget").sum().alias("budget"),
-            pl.col("_spent").sum().alias("spent"),
-        ])
+        .agg(
+            [
+                pl.col("_budget").sum().alias("budget"),
+                pl.col("_spent").sum().alias("spent"),
+            ]
+        )
         .sort("budget", descending=True)
         .head(15)
         .to_pandas()
         .iloc[::-1]
         .reset_index(drop=True)
     )
-    _top["exec_pct"] = (_top["spent"] / _top["budget"].where(_top["budget"] > 0, 1) * 100).fillna(0)
+    _top["exec_pct"] = (
+        _top["spent"] / _top["budget"].where(_top["budget"] > 0, 1) * 100
+    ).fillna(0)
 
     def _exec_color(pct):
         if pct >= 85:
@@ -236,49 +276,71 @@ def _(df, fmt_mxn, go, has_spent, pl, style_fig):
 
     _fig = go.Figure()
 
-    _fig.add_trace(go.Bar(
-        y=_top["desc_funcion"], x=_top["budget"], orientation="h",
-        marker=dict(color="#E2E8F0"), width=0.78,
-        name="Presupuesto",
-        hovertemplate="<b>%{y}</b><br>Presupuesto: %{customdata}<extra></extra>",
-        customdata=[fmt_mxn(v) for v in _top["budget"]],
-    ))
-
-    if has_spent:
-        _fig.add_trace(go.Bar(
-            y=_top["desc_funcion"], x=_top["spent"], orientation="h",
-            marker=dict(color=[_exec_color(p) for p in _top["exec_pct"]]),
-            width=0.42,
-            name="Ejercido",
-            hovertemplate="<b>%{y}</b><br>Ejercido: %{customdata}<extra></extra>",
-            customdata=[fmt_mxn(v) for v in _top["spent"]],
-        ))
-
-        _fig.add_trace(go.Scatter(
+    _fig.add_trace(
+        go.Bar(
             y=_top["desc_funcion"],
             x=_top["budget"],
-            mode="text",
-            text=[f"  {p:.0f}%" for p in _top["exec_pct"]],
-            textposition="middle right",
-            textfont=dict(size=12, family="Inter",
-                          color=[_exec_color(p) for p in _top["exec_pct"]]),
-            showlegend=False,
-            hoverinfo="skip",
-            cliponaxis=False,
-        ))
+            orientation="h",
+            marker=dict(color="#E2E8F0"),
+            width=0.78,
+            name="Presupuesto",
+            hovertemplate="<b>%{y}</b><br>Presupuesto: %{customdata}<extra></extra>",
+            customdata=[fmt_mxn(v) for v in _top["budget"]],
+        )
+    )
+
+    if has_spent:
+        _fig.add_trace(
+            go.Bar(
+                y=_top["desc_funcion"],
+                x=_top["spent"],
+                orientation="h",
+                marker=dict(color=[_exec_color(p) for p in _top["exec_pct"]]),
+                width=0.42,
+                name="Ejercido",
+                hovertemplate="<b>%{y}</b><br>Ejercido: %{customdata}<extra></extra>",
+                customdata=[fmt_mxn(v) for v in _top["spent"]],
+            )
+        )
+
+        _fig.add_trace(
+            go.Scatter(
+                y=_top["desc_funcion"],
+                x=_top["budget"],
+                mode="text",
+                text=[f"  {p:.0f}%" for p in _top["exec_pct"]],
+                textposition="middle right",
+                textfont=dict(
+                    size=12,
+                    family="Inter",
+                    color=[_exec_color(p) for p in _top["exec_pct"]],
+                ),
+                showlegend=False,
+                hoverinfo="skip",
+                cliponaxis=False,
+            )
+        )
 
     _max_x = float(_top["budget"].max())
     _fig.update_layout(
         barmode="overlay",
         bargap=0.35,
         xaxis=dict(
-            showgrid=True, gridcolor="#F1F5F9",
-            tickformat=".2s", title="",
+            showgrid=True,
+            gridcolor="#F1F5F9",
+            tickformat=".2s",
+            title="",
             range=[0, _max_x * 1.12],
         ),
         yaxis=dict(title="", tickfont=dict(size=12), automargin=True),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, xanchor="left",
-                    bgcolor="rgba(0,0,0,0)"),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            x=0,
+            xanchor="left",
+            bgcolor="rgba(0,0,0,0)",
+        ),
     )
     style_fig(_fig, height=620)
     _fig.update_layout(margin=dict(l=10, r=40, t=40, b=20))
@@ -346,26 +408,47 @@ def _(mo):
 @app.cell
 def _(df, fmt_mxn, pl, px, style_fig):
     sdg_colors = {
-        1: "#E5243B", 2: "#DDA63A", 3: "#4C9F38", 4: "#C5192D", 5: "#FF3A21",
-        6: "#26BDE2", 7: "#FCC30B", 8: "#A21942", 9: "#FD6925", 10: "#DD1367",
-        11: "#FD9D24", 12: "#BF8B2E", 13: "#3F7E44", 14: "#0A97D9", 15: "#56C02B",
-        16: "#00689D", 17: "#19486A",
+        1: "#E5243B",
+        2: "#DDA63A",
+        3: "#4C9F38",
+        4: "#C5192D",
+        5: "#FF3A21",
+        6: "#26BDE2",
+        7: "#FCC30B",
+        8: "#A21942",
+        9: "#FD6925",
+        10: "#DD1367",
+        11: "#FD9D24",
+        12: "#BF8B2E",
+        13: "#3F7E44",
+        14: "#0A97D9",
+        15: "#56C02B",
+        16: "#00689D",
+        17: "#19486A",
     }
 
     sdg = (
-        df.group_by(["objetivo_desarrollo_sostenible", "desc_objetivo_desarrollo_sostenible"])
+        df.group_by(
+            ["objetivo_desarrollo_sostenible", "desc_objetivo_desarrollo_sostenible"]
+        )
         .agg(pl.col("_amount").sum())
         .filter(pl.col("_amount") > 0)
         .sort("_amount", descending=True)
         .to_pandas()
     )
     sdg["label"] = sdg["_amount"].apply(fmt_mxn)
-    sdg["color"] = sdg["objetivo_desarrollo_sostenible"].map(sdg_colors).fillna("#94A3B8")
-    sdg["name"] = sdg.apply(
-        lambda r: f"ODS {int(r['objetivo_desarrollo_sostenible'])}: {r['desc_objetivo_desarrollo_sostenible']}"
-        if r["desc_objetivo_desarrollo_sostenible"] else "Sin ODS asignado",
-        axis=1,
+    sdg["color"] = (
+        sdg["objetivo_desarrollo_sostenible"].map(sdg_colors).fillna("#94A3B8")
     )
+
+    def _sdg_name(r):
+        _ods = r["objetivo_desarrollo_sostenible"]
+        _desc = r["desc_objetivo_desarrollo_sostenible"]
+        if _ods != _ods or _desc != _desc or not str(_desc).strip():
+            return "Sin ODS asignado"
+        return f"ODS {int(float(_ods))}: {_desc}"
+
+    sdg["name"] = sdg.apply(_sdg_name, axis=1)
 
     _fig = px.bar(
         sdg.sort_values("_amount"),
@@ -440,7 +523,10 @@ def _(PALETTE, df, fmt_mxn, go, pl, style_fig):
         annotations=[
             dict(
                 text=f"<b style='font-size:22px;color:#0F172A'>{fmt_mxn(cap['_amount'].sum())}</b><br><span style='font-size:11px;color:#64748B;letter-spacing:1px'>TOTAL</span>",
-                x=0.5, y=0.5, showarrow=False, align="center",
+                x=0.5,
+                y=0.5,
+                showarrow=False,
+                align="center",
             )
         ],
     )
@@ -477,13 +563,21 @@ def _(df, fmt_mxn, mo, pl, search):
     mo.stop(len(q) < 2, mo.md("*Escribe al menos 2 caracteres...*"))
 
     mask = (
-        pl.col("desc_unidad_responsable").str.to_lowercase().str.contains(q, literal=True)
-        | pl.col("desc_programa_presupuestario").str.to_lowercase().str.contains(q, literal=True)
+        pl.col("desc_unidad_responsable")
+        .str.to_lowercase()
+        .str.contains(q, literal=True)
+        | pl.col("desc_programa_presupuestario")
+        .str.to_lowercase()
+        .str.contains(q, literal=True)
         | pl.col("desc_funcion").str.to_lowercase().str.contains(q, literal=True)
-        | pl.col("desc_partida_especifica").str.to_lowercase().str.contains(q, literal=True)
+        | pl.col("desc_partida_especifica")
+        .str.to_lowercase()
+        .str.contains(q, literal=True)
     )
     matches = df.filter(mask)
-    mo.md(f"**{matches.height:,} coincidencias** · total: **{fmt_mxn(matches['_amount'].sum())}**")
+    mo.md(
+        f"**{matches.height:,} coincidencias** · total: **{fmt_mxn(matches['_amount'].sum())}**"
+    )
     return (matches,)
 
 
@@ -494,8 +588,15 @@ def _(fmt_mxn, matches, mo, pl):
         .agg(pl.col("_amount").sum())
         .sort("_amount", descending=True)
         .head(50)
-        .with_columns(pl.col("_amount").map_elements(fmt_mxn, return_dtype=pl.Utf8).alias("Monto"))
-        .rename({"desc_unidad_responsable": "Unidad", "desc_programa_presupuestario": "Programa"})
+        .with_columns(
+            pl.col("_amount").map_elements(fmt_mxn, return_dtype=pl.Utf8).alias("Monto")
+        )
+        .rename(
+            {
+                "desc_unidad_responsable": "Unidad",
+                "desc_programa_presupuestario": "Programa",
+            }
+        )
         .select(["Unidad", "Programa", "Monto"])
         .to_pandas()
     )

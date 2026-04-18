@@ -1690,24 +1690,38 @@ def _(mo):
 @app.cell
 def _(
     agent_input, agent_reset, agent_submit,
+    budget_tree_df, crosswalk_df, egresos_all, ingresos_raw,
+    named_programs_df, pl, rally_raw,
     get_agent_history, get_reset_seen, get_submit_seen,
     set_agent_error, set_agent_history, set_reset_seen, set_submit_seen,
 ):
     # Side-effect cell: runs the agent loop when submit is clicked.
-    # Button .value is a click count — we gate on count > last-seen.
+    # Exposes 7 dashboard-backed tools (covering tabs I–VII) plus 10
+    # MCP tools from cdmx-data (Metro, FGJ, aire, Locatel, CKAN, geocruce).
     import json
     import os
     import sys
     import importlib.util as _iu
     from pathlib import Path
 
-    # Reset?
+    # Load .env from repo root if it exists (so ANTHROPIC_API_KEY etc. flow through).
+    _env_file = Path(__file__).parent.parent / ".env"
+    if _env_file.exists():
+        for _line in _env_file.read_text().splitlines():
+            _line = _line.strip()
+            if not _line or _line.startswith("#") or "=" not in _line:
+                continue
+            _k, _v = _line.split("=", 1)
+            _k = _k.strip()
+            _v = _v.strip().strip('"').strip("'")
+            if _k and _k not in os.environ:
+                os.environ[_k] = _v
+
     if (agent_reset.value or 0) > get_reset_seen():
         set_reset_seen(agent_reset.value or 0)
         set_agent_history([])
         set_agent_error(None)
 
-    # Submit?
     _count = agent_submit.value or 0
     if _count > get_submit_seen() and (agent_input.value or "").strip():
         set_submit_seen(_count)
@@ -1716,8 +1730,7 @@ def _(
 
         if not _api_key:
             set_agent_error(
-                "ANTHROPIC_API_KEY no está configurada. "
-                "Expórtala antes de arrancar el notebook."
+                "ANTHROPIC_API_KEY no está configurada. Expórtala antes de arrancar el notebook."
             )
         else:
             try:
@@ -1727,7 +1740,7 @@ def _(
                 set_agent_error("Falta el paquete 'anthropic'. Corre `uv add anthropic`.")
 
             _cdmx = None
-            _dispatch = None
+            _mcp_dispatch = None
             if anthropic is not None:
                 _mcp_src = Path(__file__).parent.parent / "mcp" / "src"
                 if str(_mcp_src) not in sys.path:
@@ -1740,44 +1753,248 @@ def _(
                     )
                     _mod = _iu.module_from_spec(_spec)
                     _spec.loader.exec_module(_mod)
-                    _dispatch = _mod._dispatch
+                    _mcp_dispatch = _mod._dispatch
                     _cdmx = CDMX()
                 except Exception as _e:
                     set_agent_error(f"No pude inicializar cdmx-data: {_e}")
 
-            if _cdmx is not None and _dispatch is not None and anthropic is not None:
-                _TOOLS = [
-                    {"name": "cdmx_search", "description": "Busca datasets en el portal datos.cdmx.gob.mx",
+            # ─── Dashboard tools dispatch (tabs I–VII data) ───
+            def _dashboard_dispatch(name, args):
+                if name == "dashboard_budget_summary":
+                    if budget_tree_df is None:
+                        return {"error": "budget_tree.parquet no disponible"}
+                    _y = args.get("year")
+                    _df = budget_tree_df.filter(pl.col("level") == 1)
+                    if _y is not None:
+                        _df = _df.filter(pl.col("year") == int(_y))
+                    _df = _df.sort("monto_aprobado", descending=True)
+                    return {
+                        "year": _y,
+                        "source": "data/clean/budget_tree.parquet (crosswalk editorial, 16 categorías ciudadanas)",
+                        "total_monto_aprobado": float(_df["monto_aprobado"].sum() or 0),
+                        "records": _df.select([
+                            "citizen_category", "monto_aprobado",
+                            "per_100_of_total", "year",
+                        ]).to_dicts(),
+                    }
+
+                if name == "dashboard_budget_drill":
+                    if budget_tree_df is None:
+                        return {"error": "budget_tree.parquet no disponible"}
+                    _cat = args.get("citizen_category")
+                    if not _cat:
+                        return {"error": "Falta 'citizen_category'. Usa primero dashboard_budget_summary."}
+                    _y = args.get("year")
+                    _top_n = int(args.get("top_n") or 20)
+                    _df = budget_tree_df.filter(
+                        (pl.col("level") == 2) & (pl.col("citizen_category") == _cat)
+                    )
+                    if _y is not None:
+                        _df = _df.filter(pl.col("year") == int(_y))
+                    _df = _df.sort("monto_aprobado", descending=True).head(_top_n)
+                    return {
+                        "citizen_category": _cat, "year": _y,
+                        "source": "data/clean/budget_tree.parquet + crosswalk/crosswalk.csv",
+                        "total_monto_aprobado": float(_df["monto_aprobado"].sum() or 0),
+                        "records": _df.select([
+                            "display_name", "monto_aprobado",
+                            "per_100_of_parent", "rationale",
+                        ]).to_dicts(),
+                    }
+
+                if name == "dashboard_named_programs":
+                    if named_programs_df is None:
+                        return {"error": "named_programs_2024.csv no disponible"}
+                    _q = (args.get("query") or "").lower()
+                    _top_n = int(args.get("top_n") or 20)
+                    _df = named_programs_df.filter(pl.col("monto_aprobado_mxn") > 0)
+                    if _q:
+                        _df = _df.filter(
+                            pl.col("display_name").str.to_lowercase().str.contains(_q, literal=True)
+                            | pl.col("ente_ejecutor").str.to_lowercase().str.contains(_q, literal=True)
+                            | pl.col("section").str.to_lowercase().str.contains(_q, literal=True)
+                        )
+                    _df = _df.sort("monto_aprobado_mxn", descending=True).head(_top_n)
+                    return {
+                        "query": args.get("query"),
+                        "source": "crosswalk/named_programs_2024.csv (Paquete Económico 2024 PDFs)",
+                        "total_filtered": float(_df["monto_aprobado_mxn"].sum() or 0),
+                        "records": _df.to_dicts(),
+                    }
+
+                if name == "dashboard_egresos_aggregate":
+                    if egresos_all is None:
+                        return {"error": "egresos_all no disponible"}
+                    _y = args.get("year")
+                    _dim = args.get("group_by") or "desc_funcion"
+                    _valid = {"desc_funcion", "desc_unidad_responsable", "desc_capitulo"}
+                    if _dim not in _valid:
+                        return {"error": f"group_by inválido. Usa uno de {sorted(_valid)}"}
+                    _top_n = int(args.get("top_n") or 15)
+                    _df = egresos_all
+                    if _y is not None:
+                        _df = _df.filter(pl.col("_year") == int(_y))
+                    _agg = (
+                        _df.group_by(_dim)
+                           .agg([
+                               pl.col("_budget").sum().alias("monto_aprobado"),
+                               pl.col("_spent").sum().alias("monto_ejercido"),
+                           ])
+                           .sort("monto_aprobado", descending=True)
+                           .head(_top_n)
+                    )
+                    return {
+                        "year": _y, "group_by": _dim,
+                        "source": "data/egresos_{2018..2024}_{cp|aprobado|trimestre}.csv",
+                        "records": _agg.to_dicts(),
+                    }
+
+                if name == "dashboard_ingresos":
+                    if ingresos_raw is None:
+                        return {"error": "ingresos_main.csv no disponible"}
+                    _ciclo = args.get("ciclo")
+                    _periodo = args.get("periodo")
+                    _df = ingresos_raw
+                    if _ciclo is not None:
+                        _df = _df.filter(pl.col("ciclo") == int(_ciclo))
+                    if _periodo:
+                        _df = _df.filter(pl.col("periodo") == _periodo)
+                    _gb = args.get("group_by") or "_bucket"
+                    _valid = {"_bucket", "desc_rubro", "desc_concepto", "desc_tipo_recurso_clase"}
+                    if _gb not in _valid:
+                        return {"error": f"group_by inválido. Usa uno de {sorted(_valid)}"}
+                    _top_n = int(args.get("top_n") or 20)
+                    _amt = "monto_recaudado" if _periodo == "Cuenta Pública" else "monto_estimado"
+                    _agg = (
+                        _df.group_by(_gb)
+                           .agg(pl.col(_amt).sum().alias("monto"))
+                           .filter(pl.col("monto") > 0)
+                           .sort("monto", descending=True)
+                           .head(_top_n)
+                    )
+                    return {
+                        "ciclo": _ciclo, "periodo": _periodo,
+                        "group_by": _gb, "amount_col": _amt,
+                        "source": "data/ingresos_main.csv",
+                        "records": _agg.to_dicts(),
+                    }
+
+                if name == "dashboard_rally_obras":
+                    if rally_raw is None:
+                        return {"error": "rally_obras.csv no disponible"}
+                    _alc = args.get("alcaldia")
+                    _ramo = args.get("ramo")
+                    _from = args.get("ciclo_from")
+                    _to = args.get("ciclo_to")
+                    _top_n = int(args.get("top_n") or 15)
+                    _df = rally_raw.filter(pl.col("monto_ejercido") > 0)
+                    if _alc:
+                        _df = _df.filter(pl.col("desc_alcaldia").str.contains(_alc, literal=True))
+                    if _ramo:
+                        _df = _df.filter(pl.col("desc_ramo").str.contains(_ramo, literal=True))
+                    if _from is not None:
+                        _df = _df.filter(pl.col("ciclo") >= int(_from))
+                    if _to is not None:
+                        _df = _df.filter(pl.col("ciclo") <= int(_to))
+                    _df = _df.sort("monto_ejercido", descending=True).head(_top_n)
+                    _cols = [
+                        "id", "nombre_proyecto", "desc_ramo", "desc_alcaldia",
+                        "contratista", "monto_ejercido", "ciclo", "avance_fisico",
+                    ]
+                    _have = [c for c in _cols if c in _df.columns]
+                    return {
+                        "filters": {"alcaldia": _alc, "ramo": _ramo, "ciclo_from": _from, "ciclo_to": _to},
+                        "source": "data/rally_obras.csv · Rally ¿Cómo van las obras? 2013–2018 (proyectos federales georreferenciados)",
+                        "total_filtered": float(_df["monto_ejercido"].sum() or 0),
+                        "records": _df.select(_have).to_dicts(),
+                    }
+
+                if name == "dashboard_crosswalk_lookup":
+                    if crosswalk_df is None:
+                        return {"error": "crosswalk.csv no disponible"}
+                    _q = (args.get("query") or "").lower()
+                    if not _q:
+                        return {"error": "Falta 'query'"}
+                    _df = crosswalk_df.filter(
+                        pl.col("source_label").cast(pl.Utf8, strict=False).str.to_lowercase().str.contains(_q, literal=True)
+                        | pl.col("display_name").cast(pl.Utf8, strict=False).str.to_lowercase().str.contains(_q, literal=True)
+                    ).head(20)
+                    return {
+                        "query": args.get("query"),
+                        "source": "crosswalk/crosswalk.csv (19k rows, 16 categorías, rationale por fila)",
+                        "records": _df.to_dicts(),
+                    }
+
+                raise ValueError(f"Dashboard tool desconocida: {name}")
+
+            if _cdmx is not None and _mcp_dispatch is not None and anthropic is not None:
+                _DASHBOARD_TOOLS = [
+                    {"name": "dashboard_budget_summary",
+                     "description": "RESUMEN DEL PRESUPUESTO CDMX por 16 categorías ciudadanas (Agua, Transporte, Seguridad, Salud, Educación, Apoyos sociales, etc.) — datos de la pestaña ⑥ Ciudadano. Devuelve Level-1 con monto_aprobado y 'de cada 100 pesos'. Usa esta tool para preguntas tipo '¿a dónde va el presupuesto?' / '¿cuánto se gasta en X?' / 'reparto por categoría'.",
+                     "input_schema": {"type": "object", "properties": {"year": {"type": "integer", "description": "2018–2024"}}}},
+                    {"name": "dashboard_budget_drill",
+                     "description": "DETALLE DE UNA CATEGORÍA — lista los programas presupuestarios dentro de una categoría ciudadana (ej. Agua → 'Operación SACMEX', 'Sectorización Iztapalapa'…). Datos de la pestaña ⑥. Requiere 'citizen_category' (una de las 16). Devuelve top_n programas con display_name, monto, % de la categoría y rationale editorial.",
+                     "input_schema": {"type": "object", "properties": {"citizen_category": {"type": "string", "description": "ej. 'Agua', 'Transporte público', 'Salud', 'Apoyos sociales', 'Gobierno y administración', 'Deuda', 'Otros'"}, "year": {"type": "integer"}, "top_n": {"type": "integer", "default": 20}}, "required": ["citizen_category"]}},
+                    {"name": "dashboard_named_programs",
+                     "description": "PROGRAMAS EMBLEMÁTICOS con nombre propio (Cablebús L3, Utopías, Pilares, Mi Beca, Altépetl, Cosecha de Lluvia, Comedores, Sí al Desarme…) — datos de la pestaña ⑦ Emblemáticos. Fuente: Paquete Económico 2024 PDFs. Estos programas NO aparecen como desc_programa_presupuestario en la CSV oficial. Usa esta tool cuando pregunten por un nombre específico.",
+                     "input_schema": {"type": "object", "properties": {"query": {"type": "string", "description": "filtra por subcadena en display_name / ente_ejecutor / section. Omite para ver todos."}, "top_n": {"type": "integer", "default": 20}}}},
+                    {"name": "dashboard_egresos_aggregate",
+                     "description": "AGREGADO DE EGRESOS (tabs ① Flujo / ③ Se prometen / ⑤ Explora). Agrupa las CSV oficiales de Cuenta Pública 2018–2022 + Q3 trimestral 2023 + aprobado 2024 por función, unidad responsable, o capítulo. Devuelve monto_aprobado vs monto_ejercido por dimensión.",
+                     "input_schema": {"type": "object", "properties": {"year": {"type": "integer", "description": "2018–2024"}, "group_by": {"type": "string", "enum": ["desc_funcion", "desc_unidad_responsable", "desc_capitulo"], "default": "desc_funcion"}, "top_n": {"type": "integer", "default": 15}}}},
+                    {"name": "dashboard_ingresos",
+                     "description": "INGRESOS CDMX (tab ② Entran). Agrupa la Ley de Ingresos + Cuenta Pública por bucket (Impuestos locales, Federal participaciones+aportaciones, Derechos y productos, Sector paraestatal, Financiamientos, Otros) o por rubro/concepto.",
+                     "input_schema": {"type": "object", "properties": {"ciclo": {"type": "integer", "description": "2018–2024"}, "periodo": {"type": "string", "enum": ["Anual", "Cuenta Pública"], "description": "Anual = planeado en Ley de Ingresos. Cuenta Pública = recaudado real."}, "group_by": {"type": "string", "enum": ["_bucket", "desc_rubro", "desc_concepto", "desc_tipo_recurso_clase"], "default": "_bucket"}, "top_n": {"type": "integer", "default": 20}}}},
+                    {"name": "dashboard_rally_obras",
+                     "description": "OBRAS FEDERALES GEOLOCALIZADAS 2013–2018 (tab ④ Aterrizan). Rally ¿Cómo van las obras? — proyectos con contratista, ramo federal, monto ejercido, alcaldía y avance físico. Usa esta tool para '¿qué se construyó en X alcaldía?' o 'top contratistas'.",
+                     "input_schema": {"type": "object", "properties": {"alcaldia": {"type": "string"}, "ramo": {"type": "string", "description": "ej. 'Comunicaciones y Transportes', 'Salud', 'Educación Pública'"}, "ciclo_from": {"type": "integer"}, "ciclo_to": {"type": "integer"}, "top_n": {"type": "integer", "default": 15}}}},
+                    {"name": "dashboard_crosswalk_lookup",
+                     "description": "BÚSQUEDA EN EL CROSSWALK editorial. Busca un programa presupuestario específico por subcadena en source_label o display_name. Devuelve su citizen_category asignada y el rationale de por qué quedó en esa categoría.",
+                     "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
+                ]
+
+                _MCP_TOOLS = [
+                    {"name": "cdmx_search", "description": "Busca datasets en el portal datos.cdmx.gob.mx (búsqueda libre de texto en el catálogo CKAN — usa esto si la pregunta no encaja con ninguna tool dashboard_ o cdmx_* específica).",
                      "input_schema": {"type": "object", "properties": {"query": {"type": "string"}, "max_results": {"type": "integer", "default": 10}}, "required": ["query"]}},
-                    {"name": "cdmx_catalog", "description": "Lista datasets del catálogo interno (filtro: movilidad, seguridad, aire, servicios, finanzas, geo)",
+                    {"name": "cdmx_catalog", "description": "Lista datasets del catálogo interno curado. Tracks: movilidad, seguridad, aire, servicios, finanzas, geo.",
                      "input_schema": {"type": "object", "properties": {"track": {"type": "string"}}}},
-                    {"name": "cdmx_fetch_resource", "description": "Descarga registros de un recurso CKAN por resource_id",
+                    {"name": "cdmx_fetch_resource", "description": "Descarga registros de un recurso CKAN por resource_id UUID. Útil tras cdmx_search / cdmx_catalog.",
                      "input_schema": {"type": "object", "properties": {"resource_id": {"type": "string"}, "max_records": {"type": "integer", "default": 100}}, "required": ["resource_id"]}},
-                    {"name": "cdmx_movilidad_metro", "description": "Afluencia diaria del Metro CDMX por línea y estación",
-                     "input_schema": {"type": "object", "properties": {"desde": {"type": "string", "description": "YYYY-MM-DD"}, "hasta": {"type": "string", "description": "YYYY-MM-DD"}, "linea": {"type": "string", "description": "Número de línea (1, 2, … o A)"}}}},
-                    {"name": "cdmx_seguridad_fgj", "description": "Carpetas de investigación de la FGJ CDMX",
+                    {"name": "cdmx_movilidad_metro", "description": "AFLUENCIA DIARIA DEL METRO por línea y estación. NO tiene relación con el presupuesto — es datos de pasajeros.",
+                     "input_schema": {"type": "object", "properties": {"desde": {"type": "string", "description": "YYYY-MM-DD"}, "hasta": {"type": "string"}, "linea": {"type": "string"}}}},
+                    {"name": "cdmx_seguridad_fgj", "description": "CARPETAS DE INVESTIGACIÓN de la FGJ CDMX. Datos de delitos reportados.",
                      "input_schema": {"type": "object", "properties": {"alcaldia": {"type": "string"}, "delito_contiene": {"type": "string"}, "desde": {"type": "string"}, "hasta": {"type": "string"}}}},
-                    {"name": "cdmx_aire_calidad", "description": "Calidad del aire por estación SIMAT",
+                    {"name": "cdmx_aire_calidad", "description": "CALIDAD DEL AIRE por estación SIMAT (mediciones ambientales, no presupuesto).",
                      "input_schema": {"type": "object", "properties": {"contaminante": {"type": "string", "description": "PM25, PM10, O3, NO2, CO, SO2"}, "estacion": {"type": "string"}}}},
-                    {"name": "cdmx_servicios_locatel", "description": "Solicitudes recibidas por Locatel *0311",
+                    {"name": "cdmx_servicios_locatel", "description": "SOLICITUDES A LOCATEL *0311 (quejas y reportes ciudadanos).",
                      "input_schema": {"type": "object", "properties": {"alcaldia": {"type": "string"}, "desde": {"type": "string"}, "hasta": {"type": "string"}}}},
-                    {"name": "cdmx_finanzas_proveedores", "description": "Padrón de proveedores del gobierno CDMX",
+                    {"name": "cdmx_finanzas_proveedores", "description": "PADRÓN DE PROVEEDORES del gobierno CDMX (RFC y razón social; no montos).",
                      "input_schema": {"type": "object", "properties": {"nombre_contiene": {"type": "string"}}}},
-                    {"name": "cdmx_geo_colonia_en_punto", "description": "Geocruce: la colonia que contiene el punto lat/lon",
+                    {"name": "cdmx_geo_colonia_en_punto", "description": "GEOCRUCE: devuelve la colonia que contiene el punto lat/lon.",
                      "input_schema": {"type": "object", "properties": {"lat": {"type": "number"}, "lon": {"type": "number"}}, "required": ["lat", "lon"]}},
-                    {"name": "cdmx_sql_remote", "description": "SQL read-only sobre CKAN. La tabla se referencia como '\"<resource_id>\"'",
+                    {"name": "cdmx_sql_remote", "description": "SQL read-only sobre CKAN. Tabla='\"<resource_id>\"'. Para consultas sobre recursos que no caen en ninguna tool específica.",
                      "input_schema": {"type": "object", "properties": {"sql": {"type": "string"}}, "required": ["sql"]}},
                 ]
 
+                _TOOLS = _DASHBOARD_TOOLS + _MCP_TOOLS
+
                 _SYSTEM = (
-                    "Eres un asistente conversacional para el dashboard 'La ruta de tu peso' de CDMX. "
-                    "Tienes acceso a herramientas que consultan el portal de datos abiertos de la Ciudad "
-                    "(datos.cdmx.gob.mx) vía el servidor MCP cdmx-data. "
-                    "Responde brevemente en español, con cifras concretas, y cita el dataset o herramienta usada. "
-                    "Si la pregunta trata del presupuesto (reparto, aprobado vs ejercido, programas), el dashboard "
-                    "ya lo cubre en las pestañas I–VII — sugiere ir ahí cuando aplique, y si aún así quieres "
-                    "consultar, usa cdmx_fetch_resource o cdmx_sql_remote. "
-                    "Si una herramienta devuelve error o datos vacíos, no inventes — dilo."
+                    "Eres el asistente de 'La ruta de tu peso' — un dashboard de finanzas públicas de CDMX "
+                    "con 7 pestañas que cubren Flujo (Sankey ingresos→capítulos), Entran (ingresos), "
+                    "Se prometen (egresos por capítulo y programa), Aterrizan (contratistas Rally), Explora "
+                    "(tendencias multi-año), Ciudadano (16 categorías ciudadanas) y Emblemáticos (programas "
+                    "con nombre propio).\n\n"
+                    "Tienes 17 herramientas: 7 dashboard_* (la fuente de las pestañas) y 10 cdmx_* (datos "
+                    "adicionales de CDMX vía MCP: Metro, FGJ, aire, Locatel, etc.).\n\n"
+                    "REGLAS:\n"
+                    "1. Para preguntas de presupuesto / egresos / ingresos / Cablebús / Pilares / Mi Beca / "
+                    "Altépetl / contratistas / programas emblemáticos / categorías ciudadanas → "
+                    "SIEMPRE usa primero una tool dashboard_*. Son la fuente canónica y están pre-agregadas.\n"
+                    "2. Para movilidad, seguridad, aire, Locatel, proveedores → usa las cdmx_*.\n"
+                    "3. Para preguntas que no caen en nada específico → cdmx_search o cdmx_sql_remote.\n"
+                    "4. Siempre responde en español, con cifras concretas. Cita la tool o archivo usado al final.\n"
+                    "5. Si el resultado es error o vacío, DI ESO — nunca inventes números.\n"
+                    "6. Cuando sirva, menciona la pestaña relevante: 'Puedes ver esto visualmente en la pestaña ⑥ Ciudadano.'\n"
+                    "7. Sé breve: máximo 4–5 líneas, salvo que el usuario pida detalle."
                 )
 
                 _client = anthropic.Anthropic(api_key=_api_key)
@@ -1785,7 +2002,7 @@ def _(
                 _history.append({"role": "user", "content": _question})
 
                 try:
-                    for _iter in range(6):
+                    for _iter in range(8):
                         _resp = _client.messages.create(
                             model="claude-sonnet-4-6",
                             max_tokens=2048,
@@ -1808,12 +2025,15 @@ def _(
                         for _b in _resp.content:
                             if _b.type == "tool_use":
                                 try:
-                                    _r = _dispatch(_cdmx, _b.name, _b.input or {})
+                                    if _b.name.startswith("dashboard_"):
+                                        _r = _dashboard_dispatch(_b.name, _b.input or {})
+                                    else:
+                                        _r = _mcp_dispatch(_cdmx, _b.name, _b.input or {})
                                     _text = json.dumps(_r, default=str, ensure_ascii=False)
                                     if len(_text) > 8000:
-                                        _text = _text[:8000] + "…[truncado por longitud]"
+                                        _text = _text[:8000] + "…[truncado]"
                                 except Exception as _te:
-                                    _text = json.dumps({"error": str(_te)}, ensure_ascii=False)
+                                    _text = json.dumps({"error": f"{type(_te).__name__}: {_te}"}, ensure_ascii=False)
                                 _results.append({"type": "tool_result", "tool_use_id": _b.id, "content": _text})
                         _history.append({"role": "user", "content": _results})
 
@@ -1832,32 +2052,222 @@ def _(
     # Render the conversational agent tab.
     import json as _json
     import os as _os
+    import html as _html
+    from pathlib import Path as _Path
+
+    # Peek at .env for the key too — the handler cell loads it but we
+    # want the badge to reflect reality before a first send.
+    if not _os.environ.get("ANTHROPIC_API_KEY"):
+        _env_file = _Path(__file__).parent.parent / ".env"
+        if _env_file.exists():
+            for _line in _env_file.read_text().splitlines():
+                _line = _line.strip()
+                if not _line or _line.startswith("#") or "=" not in _line:
+                    continue
+                _k, _v = _line.split("=", 1)
+                _k = _k.strip()
+                _v = _v.strip().strip('"').strip("'")
+                if _k and _k not in _os.environ:
+                    _os.environ[_k] = _v
 
     _history = get_agent_history()
     _err = get_agent_error()
     _has_key = bool(_os.environ.get("ANTHROPIC_API_KEY"))
 
+    def _fmt_cell(v):
+        """Format a value for display in a tool-result table."""
+        if v is None:
+            return "—"
+        if isinstance(v, float):
+            if v == 0 or abs(v) < 0.01:
+                return f"{v:.2f}" if v else "0"
+            if abs(v) >= 1e9:
+                return f"${v/1e9:,.2f} mmdp"
+            if abs(v) >= 1e6:
+                return f"${v/1e6:,.1f} mdp"
+            if abs(v) >= 1e3:
+                return f"${v/1e3:,.1f} k"
+            return f"{v:,.2f}"
+        if isinstance(v, int):
+            if abs(v) >= 1000:
+                return f"{v:,}"
+            return str(v)
+        s = str(v)
+        if len(s) > 80:
+            s = s[:80] + "…"
+        return _html.escape(s)
+
+    def _render_tool_result(raw_text: str) -> str:
+        """Try to parse the tool result as JSON and render a compact table.
+        Falls back to truncated monospace text if parsing fails.
+        """
+        try:
+            obj = _json.loads(raw_text)
+        except Exception:
+            _short = raw_text[:340] + ("…" if len(raw_text) > 340 else "")
+            return (
+                '<div style="margin:4px 0 4px 46px;padding:8px 12px;background:#F8FAFC;'
+                'border:1px solid #E2E8F0;border-left:3px solid #64748B;border-radius:8px;'
+                'font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:#475569;'
+                'line-height:1.5;white-space:pre-wrap;word-break:break-word;">'
+                '<div style="font-size:9px;color:#94A3B8;letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:4px;">tool result</div>'
+                f'{_html.escape(_short)}'
+                '</div>'
+            )
+
+        if isinstance(obj, dict) and obj.get("error"):
+            return (
+                '<div style="margin:4px 0 4px 46px;padding:10px 14px;background:#FEF2F2;'
+                'border:1px solid #FECACA;border-left:3px solid #DC2626;border-radius:8px;'
+                'font-size:12px;color:#7F1D1D;line-height:1.5;">'
+                f'<b>Error de herramienta.</b> {_html.escape(str(obj["error"]))}'
+                '</div>'
+            )
+
+        meta_bits = []
+        records = None
+        if isinstance(obj, dict):
+            for k in ("year", "ciclo", "periodo", "citizen_category", "group_by", "query", "returned", "total"):
+                if k in obj and obj[k] not in (None, "", []):
+                    meta_bits.append(f'<span style="color:#475569;"><b style="color:#0F172A;">{k}</b>: {_html.escape(str(obj[k]))}</span>')
+            for k in ("total_monto_aprobado", "total_filtered"):
+                if k in obj and obj[k]:
+                    try:
+                        meta_bits.append(f'<span style="color:#475569;"><b style="color:#0F172A;">{k}</b>: {_fmt_cell(float(obj[k]))}</span>')
+                    except Exception:
+                        pass
+            src = obj.get("source")
+            records = obj.get("records")
+        else:
+            src = None
+
+        src_html = ""
+        if src:
+            src_html = (
+                '<div style="margin-top:6px;font-size:10px;color:#94A3B8;font-family:ui-monospace,SFMono-Regular,monospace;">'
+                f'fuente · {_html.escape(str(src)[:180])}'
+                '</div>'
+            )
+
+        if isinstance(records, list) and len(records) > 0 and isinstance(records[0], dict):
+            # Pick the most useful columns from the first record.
+            keys = list(records[0].keys())
+            preferred = [
+                "citizen_category", "display_name", "source_label",
+                "desc_funcion", "desc_unidad_responsable", "desc_capitulo",
+                "desc_rubro", "desc_concepto", "desc_tipo_recurso_clase",
+                "nombre_proyecto", "desc_ramo", "desc_alcaldia", "contratista",
+                "section", "ente_ejecutor",
+                "name", "title", "slug",
+                "monto_aprobado", "monto_ejercido", "monto_aprobado_mxn", "monto",
+                "per_100_of_total", "per_100_of_parent", "ciclo", "year", "avance_fisico",
+                "rationale", "notes",
+            ]
+            shown = [k for k in preferred if k in keys][:5]
+            if not shown:
+                shown = keys[:5]
+            total_rows = len(records)
+            rows_to_show = records[:8]
+
+            _thead = "".join(
+                f'<th style="text-align:{("right" if k.startswith("monto") or k.startswith("per_100") or k in ("ciclo","year","avance_fisico","total") else "left")};padding:6px 10px;border-bottom:1px solid #E2E8F0;font-size:10px;color:#64748B;letter-spacing:0.8px;text-transform:uppercase;font-weight:700;white-space:nowrap;">{_html.escape(k)}</th>'
+                for k in shown
+            )
+            _trows = []
+            for r in rows_to_show:
+                cells = []
+                for k in shown:
+                    v = r.get(k)
+                    align = "right" if (k.startswith("monto") or k.startswith("per_100") or k in ("ciclo", "year", "avance_fisico", "total")) else "left"
+                    is_num = isinstance(v, (int, float))
+                    cell = _fmt_cell(v)
+                    if align == "right":
+                        cells.append(f'<td style="text-align:right;padding:6px 10px;border-bottom:1px solid #F1F5F9;font-size:11px;color:#0F172A;font-variant-numeric:tabular-nums;white-space:nowrap;">{cell}</td>')
+                    else:
+                        cells.append(f'<td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;font-size:11px;color:#0F172A;line-height:1.35;max-width:280px;">{cell}</td>')
+                _trows.append(f"<tr>{''.join(cells)}</tr>")
+
+            footer = ""
+            if total_rows > len(rows_to_show):
+                footer = (
+                    f'<div style="padding:6px 10px;font-size:10px;color:#94A3B8;text-align:center;">'
+                    f'… mostrando {len(rows_to_show)} de {total_rows} registros'
+                    f'</div>'
+                )
+
+            meta_html = (
+                f'<div style="display:flex;flex-wrap:wrap;gap:10px;font-size:11px;padding:0 2px 8px;">{" · ".join(meta_bits)}</div>'
+                if meta_bits else ""
+            )
+
+            return (
+                '<div style="margin:4px 0 6px 46px;padding:10px 14px;background:white;'
+                'border:1px solid #E2E8F0;border-left:3px solid #64748B;border-radius:10px;'
+                'box-shadow:0 1px 2px rgba(15,23,42,0.03);">'
+                '<div style="font-size:9px;color:#94A3B8;letter-spacing:1.2px;text-transform:uppercase;font-weight:700;margin-bottom:6px;">resultado de herramienta</div>'
+                f'{meta_html}'
+                '<div style="overflow-x:auto;">'
+                '<table style="width:100%;border-collapse:collapse;font-family:Inter,system-ui,sans-serif;">'
+                f'<thead><tr>{_thead}</tr></thead>'
+                f'<tbody>{"".join(_trows)}</tbody>'
+                '</table>'
+                '</div>'
+                f'{footer}'
+                f'{src_html}'
+                '</div>'
+            )
+
+        # Non-records JSON (search results as list of strings, single dict, etc.)
+        pretty = _json.dumps(obj, ensure_ascii=False, indent=2)
+        if len(pretty) > 500:
+            pretty = pretty[:500] + "…"
+        return (
+            '<div style="margin:4px 0 4px 46px;padding:8px 12px;background:#F8FAFC;'
+            'border:1px solid #E2E8F0;border-left:3px solid #64748B;border-radius:8px;'
+            'font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:#475569;'
+            'line-height:1.5;white-space:pre-wrap;word-break:break-word;">'
+            '<div style="font-size:9px;color:#94A3B8;letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:4px;">tool result</div>'
+            f'{_html.escape(pretty)}'
+            f'{src_html}'
+            '</div>'
+        )
+
+    _n_msgs = sum(1 for _m in _history if _m["role"] in ("user", "assistant") and isinstance(_m["content"], str)) + \
+              sum(1 for _m in _history if _m["role"] == "assistant" and isinstance(_m["content"], list))
+    _n_tools = sum(
+        1 for _m in _history if _m["role"] == "assistant" and isinstance(_m["content"], list)
+        for _b in _m["content"] if isinstance(_b, dict) and _b.get("type") == "tool_use"
+    )
+
     _key_badge = (
-        '<span style="background:#DCFCE7;color:#166534;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.5px;">✓ API</span>'
+        '<span style="background:#DCFCE7;color:#166534;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.5px;">✓ API conectada</span>'
         if _has_key else
-        '<span style="background:#FEF2F2;color:#991B1B;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.5px;">⚠ sin API key</span>'
+        '<span style="background:#FEF2F2;color:#991B1B;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.5px;">⚠ sin API key (define ANTHROPIC_API_KEY en .env)</span>'
+    )
+    _stats_badge = (
+        f'<span style="background:#F1F5F9;color:#475569;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;">'
+        f'{_n_msgs} mensajes · {_n_tools} llamadas a tools</span>'
+        if _history else ""
     )
 
     _hero = mo.md(f"""
     <div style="padding:28px 34px;background:linear-gradient(135deg,#FDEBEE 0%,#FFF 55%,#FFF 100%);
         border:1px solid #E2E8F0;border-radius:16px;margin-bottom:16px;
         box-shadow:0 1px 3px rgba(15,23,42,0.03);">
-        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
             <div style="font-size:11px;color:#9F2241;letter-spacing:2px;text-transform:uppercase;font-weight:700;">⑧ Pregunta · asistente conversacional</div>
             {_key_badge}
+            {_stats_badge}
         </div>
         <div style="font-size:34px;font-weight:700;color:#0F172A;margin-top:10px;line-height:1.08;letter-spacing:-0.8px;">
             Pregúntale al presupuesto
         </div>
-        <div style="font-size:13px;color:#475569;margin:14px 0 0;line-height:1.55;max-width:860px;">
-            Claude Sonnet 4.6 conectado al servidor <b>cdmx-data</b> (MCP) — 10 herramientas que consultan
-            <a href="https://datos.cdmx.gob.mx" style="color:#9F2241;">datos.cdmx.gob.mx</a>: afluencia del Metro,
-            carpetas FGJ, calidad del aire, Locatel *0311, proveedores, geocruce por punto, SQL remoto, catálogo y búsqueda.
+        <div style="font-size:13px;color:#475569;margin:14px 0 0;line-height:1.55;max-width:880px;">
+            Claude Sonnet 4.6 con <b>17 herramientas</b>:
+            <b style="color:#9F2241;">7 del dashboard</b> (budget_tree, crosswalk, programas emblemáticos, egresos
+            multi-año, ingresos, Rally obras, crosswalk lookup) y
+            <b style="color:#1D4ED8;">10 del MCP cdmx-data</b> (Metro, FGJ, aire, Locatel, proveedores, geocruce,
+            SQL remoto, catálogo, búsqueda).
         </div>
     </div>
     """)
@@ -1868,24 +2278,18 @@ def _(
         _content = _m["content"]
         if _role == "user":
             if isinstance(_content, str):
+                _text_escaped = _html.escape(_content).replace("\n", "<br/>")
                 _msgs.append(f"""
-                <div style="display:flex;justify-content:flex-end;margin:12px 0;">
-                    <div style="max-width:76%;background:#9F2241;color:white;padding:11px 16px;border-radius:14px 14px 3px 14px;font-size:14px;line-height:1.5;">
-                        {_content}
+                <div style="display:flex;justify-content:flex-end;margin:14px 0 10px;">
+                    <div style="max-width:78%;background:#9F2241;color:white;padding:12px 16px;border-radius:14px 14px 3px 14px;font-size:14px;line-height:1.5;box-shadow:0 1px 2px rgba(159,34,65,0.2);">
+                        {_text_escaped}
                     </div>
                 </div>
                 """)
-            else:
+            elif isinstance(_content, list):
                 for _tr in _content:
                     if isinstance(_tr, dict) and _tr.get("type") == "tool_result":
-                        _txt = _tr.get("content", "")
-                        _short = _txt[:340] + ("…" if len(_txt) > 340 else "")
-                        _msgs.append(f"""
-                        <div style="margin:4px 0 4px 48px;padding:8px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-left:3px solid #64748B;border-radius:8px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:#475569;line-height:1.5;white-space:pre-wrap;word-break:break-word;">
-                            <div style="font-size:9px;color:#94A3B8;letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:4px;">tool result</div>
-                            {_short}
-                        </div>
-                        """)
+                        _msgs.append(_render_tool_result(_tr.get("content", "")))
         elif _role == "assistant":
             if isinstance(_content, list):
                 for _b in _content:
@@ -1893,40 +2297,57 @@ def _(
                     if _t == "text":
                         _text = _b.get("text", "").strip()
                         if _text:
+                            _text_html = _html.escape(_text).replace("\n\n", "</p><p style='margin:8px 0 0;'>").replace("\n", "<br/>")
                             _msgs.append(f"""
-                            <div style="display:flex;justify-content:flex-start;margin:12px 0;">
-                                <div style="max-width:80%;background:white;border:1px solid #E2E8F0;padding:12px 16px;border-radius:14px 14px 14px 3px;font-size:14px;line-height:1.55;color:#0F172A;box-shadow:0 1px 2px rgba(15,23,42,0.03);">
-                                    {_text}
+                            <div style="display:flex;justify-content:flex-start;margin:10px 0 12px;">
+                                <div style="max-width:82%;background:white;border:1px solid #E2E8F0;padding:12px 16px;border-radius:14px 14px 14px 3px;font-size:14px;line-height:1.55;color:#0F172A;box-shadow:0 1px 2px rgba(15,23,42,0.03);">
+                                    <p style="margin:0;">{_text_html}</p>
                                 </div>
                             </div>
                             """)
                     elif _t == "tool_use":
+                        _name = _b.get("name", "tool")
+                        _is_dashboard = _name.startswith("dashboard_") or _name.startswith("cdmx_presupuesto_")
+                        _bg = "#FEE2E2" if _is_dashboard else "#DBEAFE"
+                        _border = "#FCA5A5" if _is_dashboard else "#93C5FD"
+                        _txt_color = "#7F1D1D" if _is_dashboard else "#1E3A8A"
+                        _accent = "#DC2626" if _is_dashboard else "#2563EB"
+                        _kind = "dashboard" if _is_dashboard else "mcp"
                         _input_str = _json.dumps(_b.get("input") or {}, ensure_ascii=False)
-                        if len(_input_str) > 160:
-                            _input_str = _input_str[:160] + "…"
+                        if len(_input_str) > 180:
+                            _input_str = _input_str[:180] + "…"
                         _msgs.append(f"""
-                        <div style="margin:4px 0 4px 48px;padding:7px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-left:3px solid #3B82F6;border-radius:8px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:#1E3A8A;">
-                            <span style="letter-spacing:1px;text-transform:uppercase;font-weight:700;">→ {_b.get('name','tool')}</span>  {_input_str}
+                        <div style="margin:4px 0 4px 46px;padding:8px 12px;background:{_bg};border:1px solid {_border};border-left:3px solid {_accent};border-radius:8px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:{_txt_color};">
+                            <span style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;font-weight:800;opacity:0.7;">{_kind} · llamada</span>
+                            <span style="margin-left:8px;font-weight:700;">→ {_html.escape(_name)}</span>
+                            <span style="margin-left:8px;opacity:0.85;">{_html.escape(_input_str)}</span>
                         </div>
                         """)
 
     if not _msgs:
         _chat_html = """
-        <div style="padding:42px 24px;background:white;border:1.5px dashed #CBD5E1;border-radius:14px;text-align:center;color:#64748B;">
-            <div style="font-size:44px;margin-bottom:10px;">💬</div>
-            <div style="font-size:15px;font-weight:700;color:#0F172A;">Aún no hay conversación</div>
-            <div style="font-size:12px;margin-top:10px;line-height:1.6;max-width:560px;margin-left:auto;margin-right:auto;">
-                Prueba: <i>"Afluencia del Metro Línea 1 en enero 2024"</i> ·
-                <i>"Carpetas FGJ por robo en Iztapalapa"</i> ·
-                <i>"Busca 'calidad del aire'"</i> ·
-                <i>"Proveedores con 'construcción' en el nombre"</i>
+        <div style="padding:44px 24px;background:white;border:1.5px dashed #CBD5E1;border-radius:14px;text-align:center;color:#64748B;">
+            <div style="font-size:48px;margin-bottom:12px;">💬</div>
+            <div style="font-size:16px;font-weight:700;color:#0F172A;">Listo para responder</div>
+            <div style="font-size:13px;margin:14px auto 0;max-width:640px;line-height:1.7;">
+                Preguntas <b style="color:#9F2241;">dashboard</b> (usa los datos de las pestañas ①–⑦):<br/>
+                <i style="color:#475569;">"¿A dónde va el presupuesto?"</i> ·
+                <i style="color:#475569;">"¿Cuánto cuesta Cablebús?"</i> ·
+                <i style="color:#475569;">"Top 5 programas en Apoyos sociales"</i> ·
+                <i style="color:#475569;">"Egresos de Iztapalapa en 2022"</i>
+                <br/><br/>
+                Preguntas <b style="color:#1D4ED8;">MCP</b> (datos adicionales):<br/>
+                <i style="color:#475569;">"Afluencia del Metro Línea 1"</i> ·
+                <i style="color:#475569;">"Robos en Iztapalapa en 2024"</i> ·
+                <i style="color:#475569;">"Calidad del aire PM2.5 en MER"</i> ·
+                <i style="color:#475569;">"Proveedores con 'construcción' en el nombre"</i>
             </div>
         </div>
         """
     else:
         _chat_html = (
             '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;'
-            'padding:14px 18px;max-height:580px;overflow-y:auto;">'
+            'padding:16px 20px;max-height:620px;overflow-y:auto;">'
             f'{"".join(_msgs)}</div>'
         )
 
@@ -1936,18 +2357,25 @@ def _(
         mo.md(
             f'<div style="margin:10px 0;padding:12px 16px;background:#FEF2F2;border:1px solid #FECACA;'
             f'border-left:3px solid #DC2626;border-radius:8px;color:#7F1D1D;font-size:13px;line-height:1.5;">'
-            f'<b>⚠️ Error.</b> {_err}'
+            f'<b>⚠️ Error.</b> {_html.escape(_err)}'
             f'</div>'
         ) if _err else mo.md("")
+    )
+
+    _input_label = mo.md(
+        '<div style="font-size:11px;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;'
+        'font-weight:700;margin:14px 0 -2px;">Tu pregunta</div>'
     )
 
     _footer = mo.md(
         '<div style="margin:14px 0 0;padding:14px 18px;background:#F8FAFC;border:1px solid #E2E8F0;'
         'border-left:3px solid #94A3B8;border-radius:8px;font-size:12px;color:#475569;line-height:1.55;">'
-        '<b style="color:#0F172A;">Cómo funciona.</b> Claude Sonnet 4.6 recibe tu pregunta con acceso a 10 '
-        'herramientas definidas en <code>mcp/src/cdmx_data/mcp_server.py</code>. Cada tool consulta el '
-        'portal CKAN de <code>datos.cdmx.gob.mx</code> (o un CSV local si existe). Los resultados se '
-        'devuelven al modelo hasta producir la respuesta final — hasta 6 iteraciones.'
+        '<b style="color:#0F172A;">Cómo funciona.</b> Claude Sonnet 4.6 recibe tu pregunta con 17 tools: '
+        '7 <b style="color:#9F2241;">dashboard_*</b> (leen <code>data/clean/</code>, <code>crosswalk/</code>, '
+        '<code>data/egresos_*.csv</code>, <code>rally_obras.csv</code>, <code>ingresos_main.csv</code>) y '
+        '10 <b style="color:#1D4ED8;">cdmx_*</b> del servidor MCP (<code>mcp/src/cdmx_data/</code>) que '
+        'consultan <a href="https://datos.cdmx.gob.mx" style="color:#9F2241;">datos.cdmx.gob.mx</a>. '
+        'El modelo itera hasta 8 llamadas a tools para producir la respuesta final.'
         '</div>'
     )
 
@@ -1955,6 +2383,7 @@ def _(
         _hero,
         _chat,
         _error,
+        _input_label,
         agent_input,
         mo.hstack([agent_submit, agent_reset], justify="start", gap=1),
         _footer,

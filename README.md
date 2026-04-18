@@ -2,25 +2,25 @@
 
 Single integrated dashboard for Ciudad de Mexico public data, built at Claude Mexico City Lab 2026.
 
-Follow public money from budget lines to projects on the street in one product.
+Follow public money in one product, without forcing different datasets into a fake single metric story.
 
 Primary deliverable:
 
 |Product|Story|Source|
 |---|---|---|
-|`notebooks/producto_unico.py`|Producto unico integrado: presupuesto + obra publica en una sola experiencia.|Presupuesto CDMX + Rally ¿Como van las obras?|
+|`notebooks/producto_unico.py`|Producto unico con dos vistas claras: Presupuesto y Obra publica.|Presupuesto CDMX + Rally ¿Como van las obras?|
 
 ---
 
-## Narrative flow
+## Product logic
 
-The deliverable follows one storytelling arc:
+The deliverable is a single app with two complementary views:
 
-1. **Act 1 · Panorama integrado**: budget and execution at high level.
-2. **Act 2 · Presupuesto**: where money is allocated and spent by function.
-3. **Act 3 · Territorio**: where projects land in the city with georeferenced evidence.
+1. **Presupuesto**: how money is allocated and, when available, how much has been exercised.
+2. **Obra publica**: where projects are located, how much they exercised, and their physical progress.
+3. **Shared frame**: one visual language and one product shell, without pretending both datasets measure the same thing.
 
-This keeps demo and analysis in one coherent product and avoids switching between notebooks.
+This keeps the delivery coherent while avoiding misleading comparisons.
 
 ---
 
@@ -101,10 +101,10 @@ uv run marimo new notebooks/my_analysis.py
 
 ## Demo script (3-5 min)
 
-1. Open `notebooks/producto_unico.py` and select a 2018 or 2019 budget cut.
-2. In Act 1, explain the integrated KPI story (budget + execution + project progress).
-3. In Act 2, show concentration by budget function and execution gap.
-4. In Act 3, connect the same story to map evidence and territorial distribution.
+1. Open `notebooks/producto_unico.py`.
+2. Start in the `Presupuesto` view and explain allocation, execution, and concentration by function or agency.
+3. Switch to the `Obra publica` view and explain where projects are located and how much progress they report.
+4. Close by stressing that the product is unified by experience, not by forcing incompatible datasets into one metric.
 
 ## Legacy notebooks
 

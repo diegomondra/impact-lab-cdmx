@@ -159,6 +159,30 @@ def _(datasets, mo):
     return (year_picker,)
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        """
+        <div style="
+            margin: 10px 0 14px;
+            padding: 14px 16px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            color: #334155;
+            font-size: 13px;
+            line-height: 1.55;
+        ">
+        <b>Ruta narrativa del tablero</b><br>
+        1) <b>Prioridades en papel:</b> qué funciones concentran más presupuesto.<br>
+        2) <b>Ejecución institucional:</b> qué dependencias y programas concentran el gasto.<br>
+        3) <b>Rastreo puntual:</b> busca una dependencia o programa y verifica montos.
+        </div>
+        """
+    )
+    return
+
+
 @app.cell
 def _(datasets, pl, year_picker):
     df = datasets[year_picker.value]
@@ -256,7 +280,9 @@ def _(budget_label, has_spent, mo):
     )
     mo.md(
         f"""
-        ## Presupuesto vs. Ejercido — por función
+        ## Acto 1 · Prioridades en papel
+
+        ### Presupuesto vs. Ejercido — por función
 
         {_subtitle}
         """
@@ -368,7 +394,13 @@ def _(df, fmt_mxn, go, has_spent, pl, style_fig):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md("## Top unidades responsables")
+    mo.md(
+        """
+        ## Acto 2 · Ejecución institucional
+
+        ### Top unidades responsables
+        """
+    )
     return
 
 
@@ -415,7 +447,7 @@ def _(df, fmt_mxn, pl, px, style_fig):
 def _(mo):
     mo.md(
         """
-        ## Alineación con los Objetivos de Desarrollo Sostenible
+        ### Alineación con los Objetivos de Desarrollo Sostenible
 
         Cuánto presupuesto se asigna a cada ODS de la Agenda 2030.
         """
@@ -497,7 +529,7 @@ def _(df, fmt_mxn, pl, px, style_fig):
 def _(mo):
     mo.md(
         """
-        ## Clasificación económica del gasto
+        ### Clasificación económica del gasto
 
         ¿En qué se gasta? Sueldos, obra pública, transferencias, materiales. (Capítulos del gasto)
         """
@@ -557,7 +589,9 @@ def _(PALETTE, df, fmt_mxn, go, pl, style_fig):
 def _(mo):
     mo.md(
         """
-        ## Busca un programa o dependencia
+        ## Acto 3 · Rastreo puntual
+
+        ### Busca un programa o dependencia
 
         Escribe parte del nombre — por ejemplo, *"seguridad"*, *"metro"*, *"salud"*, *"educación"*.
         """

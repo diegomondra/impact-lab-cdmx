@@ -863,6 +863,167 @@ def _(
     return (act4_content,)
 
 
+@app.cell
+def _(
+    CHAPTER_PALETTE, SOURCE_COLORS, alcaldia_pick, egresos_all, egresos_df,
+    fmt_mxn, go, ingresos_raw, mo, pl, year_pick,
+):
+    _year = year_pick.value
+
+    _ing_cp = ingresos_raw.filter(
+        (pl.col("ciclo") == _year) & (pl.col("periodo") == "Cuenta Pública")
+    )
+    _ing_an = ingresos_raw.filter(
+        (pl.col("ciclo") == _year) & (pl.col("periodo") == "Anual")
+    )
+    _use_cp = _ing_cp.height > 0 and _ing_cp["monto_recaudado"].sum() > 0
+    _ing = _ing_cp if _use_cp else _ing_an
+    _amount_col = "monto_recaudado" if _use_cp else "monto_estimado"
+    _ing_label = "recaudado · Cuenta Pública" if _use_cp else "planeado · Ley de Ingresos"
+
+    _sources = (
+        _ing.group_by("_bucket")
+            .agg(pl.col(_amount_col).sum().alias("monto"))
+            .filter(pl.col("monto") > 0)
+            .sort("monto", descending=True)
+            .to_pandas()
+    )
+    _total_ingresos = float(_sources["monto"].sum())
+
+    _eg = egresos_df
+    _alc_label = alcaldia_pick.value
+    _apportion_note = ""
+    _apportion_factor = 1.0
+    if _alc_label != "Toda la CDMX":
+        _eg = _eg.filter(pl.col("desc_unidad_responsable") == _alc_label)
+        _alc_budget = float(_eg["_budget"].sum())
+        _cdmx_year_budget = float(
+            egresos_all.filter(pl.col("_year") == _year)["_budget"].sum()
+        )
+        _apportion_factor = (_alc_budget / _cdmx_year_budget) if _cdmx_year_budget > 0 else 0
+        _apportion_note = (
+            f'<div style="margin:8px 0 14px;padding:10px 14px;background:#F1F5F9;border-radius:6px;font-size:12px;color:#334155;line-height:1.55;">'
+            f'ℹ️ <b>{_alc_label}</b> representa <b>{_apportion_factor*100:.1f}%</b> del presupuesto total de CDMX. '
+            f'Las fuentes de ingreso se muestran proporcionales a esa participación, no son asignaciones exactas.'
+            f'</div>'
+        )
+
+    _uses = (
+        _eg.with_columns(pl.col("desc_capitulo").fill_null("Sin clasificar"))
+            .group_by("desc_capitulo")
+            .agg(pl.col("_spent").sum().alias("monto"))
+            .filter(pl.col("monto") > 0)
+            .sort("monto", descending=True)
+            .to_pandas()
+    )
+    if _uses.empty:
+        _uses = (
+            _eg.with_columns(pl.col("desc_capitulo").fill_null("Sin clasificar"))
+                .group_by("desc_capitulo")
+                .agg(pl.col("_budget").sum().alias("monto"))
+                .filter(pl.col("monto") > 0)
+                .sort("monto", descending=True)
+                .to_pandas()
+        )
+        _uses_label = "aprobado"
+    else:
+        _uses_label = "ejercido"
+
+    _top_n = 10
+    if len(_uses) > _top_n:
+        _rest = float(_uses["monto"].iloc[_top_n:].sum())
+        _uses = _uses.head(_top_n).copy()
+        if _rest > 0:
+            _uses = pl.concat([pl.from_pandas(_uses),
+                               pl.DataFrame({"desc_capitulo": ["Otros capítulos"], "monto": [_rest]})]).to_pandas()
+
+    if _apportion_factor != 1.0:
+        _sources = _sources.copy()
+        _sources["monto"] = _sources["monto"] * _apportion_factor
+        _total_ingresos = float(_sources["monto"].sum())
+
+    _total_egresos = float(_uses["monto"].sum())
+
+    def _hex_to_rgba(h, alpha=0.38):
+        h = h.lstrip("#")
+        return f"rgba({int(h[0:2],16)},{int(h[2:4],16)},{int(h[4:6],16)},{alpha})"
+
+    _source_names = _sources["_bucket"].tolist()
+    _use_names = _uses["desc_capitulo"].tolist()
+    _pool_label = f"Presupuesto CDMX {_year}" if _alc_label == "Toda la CDMX" else f"{_alc_label}"
+    _labels = _source_names + [_pool_label] + _use_names
+    _pool_idx = len(_source_names)
+
+    _node_colors = (
+        [SOURCE_COLORS.get(n, "#94A3B8") for n in _source_names]
+        + ["#0F172A"]
+        + [CHAPTER_PALETTE[i % len(CHAPTER_PALETTE)] for i in range(len(_use_names))]
+    )
+
+    _src_ids, _tgt_ids, _values, _link_colors = [], [], [], []
+    for _i, _row in _sources.reset_index(drop=True).iterrows():
+        _src_ids.append(_i)
+        _tgt_ids.append(_pool_idx)
+        _values.append(float(_row["monto"]))
+        _link_colors.append(_hex_to_rgba(SOURCE_COLORS.get(_row["_bucket"], "#94A3B8"), 0.38))
+    for _i, _row in _uses.reset_index(drop=True).iterrows():
+        _src_ids.append(_pool_idx)
+        _tgt_ids.append(_pool_idx + 1 + _i)
+        _values.append(float(_row["monto"]))
+        _link_colors.append(_hex_to_rgba(CHAPTER_PALETTE[_i % len(CHAPTER_PALETTE)], 0.32))
+
+    _fig_sk = go.Figure(go.Sankey(
+        arrangement="snap",
+        node=dict(
+            label=_labels,
+            color=_node_colors,
+            pad=22,
+            thickness=22,
+            line=dict(color="white", width=1),
+            hovertemplate="<b>%{label}</b><br>%{value:,.0f} MXN<extra></extra>",
+        ),
+        link=dict(
+            source=_src_ids, target=_tgt_ids, value=_values, color=_link_colors,
+            hovertemplate="<b>%{source.label} → %{target.label}</b><br>%{value:,.0f} MXN<extra></extra>",
+        ),
+        textfont=dict(size=12, color="#0F172A", family="Inter"),
+    ))
+    _fig_sk.update_layout(
+        height=640,
+        margin=dict(l=10, r=10, t=10, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, system-ui, sans-serif", size=12),
+    )
+
+    _hero = mo.md(f"""
+    <div style="padding:22px 26px;background:white;border:1px solid #E2E8F0;border-radius:14px;margin-bottom:14px;">
+        <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto IV · Flujo</div>
+        <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:4px;line-height:1.2;letter-spacing:-0.5px;">
+            De las fuentes, al capítulo de gasto
+        </div>
+        <div style="font-size:13px;color:#475569;margin:10px 0 0;line-height:1.55;">
+            <b>Izquierda:</b> ingresos {_ing_label}. <b>Centro:</b> el presupuesto consolidado.
+            <b>Derecha:</b> los {len(_use_names)} capítulos de gasto principales ({_uses_label}).
+            El grosor de cada flujo representa el monto.
+        </div>
+        {_apportion_note}
+        <div style="display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;">
+            <div style="padding:10px 14px;background:#FEF2F2;border-left:3px solid #9F2241;border-radius:6px;flex:1;min-width:160px;">
+                <div style="font-size:10px;letter-spacing:1.5px;color:#7F1D1D;text-transform:uppercase;font-weight:600;">Ingresos</div>
+                <div style="font-size:18px;font-weight:700;color:#0F172A;margin-top:3px;">{fmt_mxn(_total_ingresos)}</div>
+            </div>
+            <div style="padding:10px 14px;background:#FFF7ED;border-left:3px solid #EC6730;border-radius:6px;flex:1;min-width:160px;">
+                <div style="font-size:10px;letter-spacing:1.5px;color:#7C2D12;text-transform:uppercase;font-weight:600;">Egresos ({_uses_label})</div>
+                <div style="font-size:18px;font-weight:700;color:#0F172A;margin-top:3px;">{fmt_mxn(_total_egresos)}</div>
+            </div>
+        </div>
+    </div>
+    """)
+
+    act_flujo_content = mo.vstack([_hero, mo.ui.plotly(_fig_sk)])
+    return (act_flujo_content,)
+
+
 @app.cell(hide_code=True)
 def _(mo):
     step = mo.ui.tabs(
@@ -870,7 +1031,8 @@ def _(mo):
             "① Entran":       mo.md(""),
             "② Se prometen":  mo.md(""),
             "③ Aterrizan":    mo.md(""),
-            "④ Explora":      mo.md(""),
+            "④ Flujo":        mo.md(""),
+            "⑤ Explora":      mo.md(""),
         },
         value="① Entran",
     )
@@ -879,12 +1041,13 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(act1_content, act2_content, act3_content, act4_content, step):
+def _(act1_content, act2_content, act3_content, act4_content, act_flujo_content, step):
     _map = {
         "① Entran":       act1_content,
         "② Se prometen":  act2_content,
         "③ Aterrizan":    act3_content,
-        "④ Explora":      act4_content,
+        "④ Flujo":        act_flujo_content,
+        "⑤ Explora":      act4_content,
     }
     _map.get(step.value, act1_content)
     return

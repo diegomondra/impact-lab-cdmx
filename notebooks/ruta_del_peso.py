@@ -1954,48 +1954,32 @@ def _(
                 ]
 
                 _MCP_TOOLS = [
-                    {"name": "cdmx_search", "description": "Busca datasets en el portal datos.cdmx.gob.mx (búsqueda libre de texto en el catálogo CKAN — usa esto si la pregunta no encaja con ninguna tool dashboard_ o cdmx_* específica).",
-                     "input_schema": {"type": "object", "properties": {"query": {"type": "string"}, "max_results": {"type": "integer", "default": 10}}, "required": ["query"]}},
-                    {"name": "cdmx_catalog", "description": "Lista datasets del catálogo interno curado. Tracks: movilidad, seguridad, aire, servicios, finanzas, geo.",
-                     "input_schema": {"type": "object", "properties": {"track": {"type": "string"}}}},
-                    {"name": "cdmx_fetch_resource", "description": "Descarga registros de un recurso CKAN por resource_id UUID. Útil tras cdmx_search / cdmx_catalog.",
-                     "input_schema": {"type": "object", "properties": {"resource_id": {"type": "string"}, "max_records": {"type": "integer", "default": 100}}, "required": ["resource_id"]}},
-                    {"name": "cdmx_movilidad_metro", "description": "AFLUENCIA DIARIA DEL METRO por línea y estación. NO tiene relación con el presupuesto — es datos de pasajeros.",
-                     "input_schema": {"type": "object", "properties": {"desde": {"type": "string", "description": "YYYY-MM-DD"}, "hasta": {"type": "string"}, "linea": {"type": "string"}}}},
-                    {"name": "cdmx_seguridad_fgj", "description": "CARPETAS DE INVESTIGACIÓN de la FGJ CDMX. Datos de delitos reportados.",
-                     "input_schema": {"type": "object", "properties": {"alcaldia": {"type": "string"}, "delito_contiene": {"type": "string"}, "desde": {"type": "string"}, "hasta": {"type": "string"}}}},
-                    {"name": "cdmx_aire_calidad", "description": "CALIDAD DEL AIRE por estación SIMAT (mediciones ambientales, no presupuesto).",
-                     "input_schema": {"type": "object", "properties": {"contaminante": {"type": "string", "description": "PM25, PM10, O3, NO2, CO, SO2"}, "estacion": {"type": "string"}}}},
-                    {"name": "cdmx_servicios_locatel", "description": "SOLICITUDES A LOCATEL *0311 (quejas y reportes ciudadanos).",
-                     "input_schema": {"type": "object", "properties": {"alcaldia": {"type": "string"}, "desde": {"type": "string"}, "hasta": {"type": "string"}}}},
-                    {"name": "cdmx_finanzas_proveedores", "description": "PADRÓN DE PROVEEDORES del gobierno CDMX (RFC y razón social; no montos).",
+                    {"name": "cdmx_finanzas_proveedores", "description": "Padrón de proveedores del gobierno CDMX (empresas que reciben contratos). Filtra por nombre_contiene.",
                      "input_schema": {"type": "object", "properties": {"nombre_contiene": {"type": "string"}}}},
-                    {"name": "cdmx_geo_colonia_en_punto", "description": "GEOCRUCE: devuelve la colonia que contiene el punto lat/lon.",
-                     "input_schema": {"type": "object", "properties": {"lat": {"type": "number"}, "lon": {"type": "number"}}, "required": ["lat", "lon"]}},
-                    {"name": "cdmx_sql_remote", "description": "SQL read-only sobre CKAN. Tabla='\"<resource_id>\"'. Para consultas sobre recursos que no caen en ninguna tool específica.",
+                    {"name": "cdmx_search", "description": "Búsqueda libre en el catálogo CKAN de datos.cdmx.gob.mx. Úsalo solo si la pregunta no encaja con ninguna dashboard_* — y filtra siempre a temas financieros.",
+                     "input_schema": {"type": "object", "properties": {"query": {"type": "string"}, "max_results": {"type": "integer", "default": 10}}, "required": ["query"]}},
+                    {"name": "cdmx_sql_remote", "description": "SQL read-only sobre CKAN. Tabla='\"<resource_id>\"'. Para consultas específicas sobre recursos CKAN de finanzas que no caen en otra tool.",
                      "input_schema": {"type": "object", "properties": {"sql": {"type": "string"}}, "required": ["sql"]}},
                 ]
 
                 _TOOLS = _DASHBOARD_TOOLS + _MCP_TOOLS
 
                 _SYSTEM = (
-                    "Eres el asistente de 'La ruta de tu peso' — un dashboard de finanzas públicas de CDMX "
-                    "con 7 pestañas que cubren Flujo (Sankey ingresos→capítulos), Entran (ingresos), "
-                    "Se prometen (egresos por capítulo y programa), Aterrizan (contratistas Rally), Explora "
-                    "(tendencias multi-año), Ciudadano (16 categorías ciudadanas) y Emblemáticos (programas "
-                    "con nombre propio).\n\n"
-                    "Tienes 17 herramientas: 7 dashboard_* (la fuente de las pestañas) y 10 cdmx_* (datos "
-                    "adicionales de CDMX vía MCP: Metro, FGJ, aire, Locatel, etc.).\n\n"
+                    "Eres el asistente de 'La ruta de tu peso' — finanzas públicas de CDMX. "
+                    "ÚNICAMENTE respondes preguntas sobre presupuesto, egresos, ingresos, programas, "
+                    "contratistas, obras, categorías ciudadanas y proveedores del gobierno CDMX. "
+                    "Si te preguntan otra cosa (movilidad, seguridad, aire, clima, etc.) "
+                    "contesta amablemente que este asistente está enfocado solo en las finanzas "
+                    "públicas y sugiere reformular.\n\n"
                     "REGLAS:\n"
-                    "1. Para preguntas de presupuesto / egresos / ingresos / Cablebús / Pilares / Mi Beca / "
-                    "Altépetl / contratistas / programas emblemáticos / categorías ciudadanas → "
-                    "SIEMPRE usa primero una tool dashboard_*. Son la fuente canónica y están pre-agregadas.\n"
-                    "2. Para movilidad, seguridad, aire, Locatel, proveedores → usa las cdmx_*.\n"
-                    "3. Para preguntas que no caen en nada específico → cdmx_search o cdmx_sql_remote.\n"
-                    "4. Siempre responde en español, con cifras concretas. Cita la tool o archivo usado al final.\n"
-                    "5. Si el resultado es error o vacío, DI ESO — nunca inventes números.\n"
-                    "6. Cuando sirva, menciona la pestaña relevante: 'Puedes ver esto visualmente en la pestaña ⑥ Ciudadano.'\n"
-                    "7. Sé breve: máximo 4–5 líneas, salvo que el usuario pida detalle."
+                    "1. Preguntas sobre el dashboard (presupuesto, egresos, ingresos, programas, "
+                    "Cablebús, Pilares, Mi Beca, Altépetl, Rally, categorías) → dashboard_* primero.\n"
+                    "2. Preguntas sobre proveedores del gobierno → cdmx_finanzas_proveedores.\n"
+                    "3. Solo si nada encaja y es financiero → cdmx_search o cdmx_sql_remote.\n"
+                    "4. Responde breve (máx 4 líneas), en español, con cifras concretas.\n"
+                    "5. Cita la tool o archivo usado al final (ej: '— fuente: budget_tree.parquet').\n"
+                    "6. Si el resultado es vacío o error, dilo — no inventes.\n"
+                    "7. Cuando sirva, menciona la pestaña: '(ver ⑥ Ciudadano)'."
                 )
 
                 _client = anthropic.Anthropic(api_key=_api_key)
@@ -2233,42 +2217,17 @@ def _(
             '</div>'
         )
 
-    _n_msgs = sum(1 for _m in _history if _m["role"] in ("user", "assistant") and isinstance(_m["content"], str)) + \
-              sum(1 for _m in _history if _m["role"] == "assistant" and isinstance(_m["content"], list))
-    _n_tools = sum(
-        1 for _m in _history if _m["role"] == "assistant" and isinstance(_m["content"], list)
-        for _b in _m["content"] if isinstance(_b, dict) and _b.get("type") == "tool_use"
-    )
-
-    _key_badge = (
-        '<span style="background:#DCFCE7;color:#166534;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.5px;">✓ API conectada</span>'
-        if _has_key else
-        '<span style="background:#FEF2F2;color:#991B1B;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.5px;">⚠ sin API key (define ANTHROPIC_API_KEY en .env)</span>'
-    )
-    _stats_badge = (
-        f'<span style="background:#F1F5F9;color:#475569;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;">'
-        f'{_n_msgs} mensajes · {_n_tools} llamadas a tools</span>'
-        if _history else ""
+    # ─── Hero — thin, single line of context ───
+    _status = (
+        "" if _has_key else
+        '<span style="margin-left:10px;color:#9F1239;font-size:12px;font-weight:600;">· define ANTHROPIC_API_KEY en .env</span>'
     )
 
     _hero = mo.md(f"""
-    <div style="padding:28px 34px;background:linear-gradient(135deg,#FDEBEE 0%,#FFF 55%,#FFF 100%);
-        border:1px solid #E2E8F0;border-radius:16px;margin-bottom:16px;
-        box-shadow:0 1px 3px rgba(15,23,42,0.03);">
-        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
-            <div style="font-size:11px;color:#9F2241;letter-spacing:2px;text-transform:uppercase;font-weight:700;">⑧ Pregunta · asistente conversacional</div>
-            {_key_badge}
-            {_stats_badge}
-        </div>
-        <div style="font-size:34px;font-weight:700;color:#0F172A;margin-top:10px;line-height:1.08;letter-spacing:-0.8px;">
-            Pregúntale al presupuesto
-        </div>
-        <div style="font-size:13px;color:#475569;margin:14px 0 0;line-height:1.55;max-width:880px;">
-            Claude Sonnet 4.6 con <b>17 herramientas</b>:
-            <b style="color:#9F2241;">7 del dashboard</b> (budget_tree, crosswalk, programas emblemáticos, egresos
-            multi-año, ingresos, Rally obras, crosswalk lookup) y
-            <b style="color:#1D4ED8;">10 del MCP cdmx-data</b> (Metro, FGJ, aire, Locatel, proveedores, geocruce,
-            SQL remoto, catálogo, búsqueda).
+    <div style="margin-bottom:18px;">
+        <div style="font-size:11px;color:#9F2241;letter-spacing:2px;text-transform:uppercase;font-weight:700;">⑧ Pregunta</div>
+        <div style="font-size:32px;font-weight:700;color:#0F172A;margin-top:6px;line-height:1.1;letter-spacing:-0.6px;">
+            Pregúntale al presupuesto{_status}
         </div>
     </div>
     """)
@@ -2282,7 +2241,7 @@ def _(
                 _text_escaped = _html.escape(_content).replace("\n", "<br/>")
                 _msgs.append(f"""
                 <div style="display:flex;justify-content:flex-end;margin:14px 0 10px;">
-                    <div style="max-width:78%;background:#9F2241;color:white;padding:12px 16px;border-radius:14px 14px 3px 14px;font-size:14px;line-height:1.5;box-shadow:0 1px 2px rgba(159,34,65,0.2);">
+                    <div style="max-width:78%;background:#9F2241;color:white;padding:11px 15px;border-radius:14px 14px 3px 14px;font-size:14px;line-height:1.5;">
                         {_text_escaped}
                     </div>
                 </div>
@@ -2301,54 +2260,39 @@ def _(
                             _text_html = _html.escape(_text).replace("\n\n", "</p><p style='margin:8px 0 0;'>").replace("\n", "<br/>")
                             _msgs.append(f"""
                             <div style="display:flex;justify-content:flex-start;margin:10px 0 12px;">
-                                <div style="max-width:82%;background:white;border:1px solid #E2E8F0;padding:12px 16px;border-radius:14px 14px 14px 3px;font-size:14px;line-height:1.55;color:#0F172A;box-shadow:0 1px 2px rgba(15,23,42,0.03);">
+                                <div style="max-width:82%;background:white;border:1px solid #E2E8F0;padding:11px 15px;border-radius:14px 14px 14px 3px;font-size:14px;line-height:1.55;color:#0F172A;">
                                     <p style="margin:0;">{_text_html}</p>
                                 </div>
                             </div>
                             """)
                     elif _t == "tool_use":
                         _name = _b.get("name", "tool")
-                        _is_dashboard = _name.startswith("dashboard_") or _name.startswith("cdmx_presupuesto_")
-                        _bg = "#FEE2E2" if _is_dashboard else "#DBEAFE"
-                        _border = "#FCA5A5" if _is_dashboard else "#93C5FD"
-                        _txt_color = "#7F1D1D" if _is_dashboard else "#1E3A8A"
-                        _accent = "#DC2626" if _is_dashboard else "#2563EB"
-                        _kind = "dashboard" if _is_dashboard else "mcp"
+                        _short = _name.replace("dashboard_", "").replace("cdmx_", "")
                         _input_str = _json.dumps(_b.get("input") or {}, ensure_ascii=False)
-                        if len(_input_str) > 180:
-                            _input_str = _input_str[:180] + "…"
+                        if len(_input_str) > 140:
+                            _input_str = _input_str[:140] + "…"
                         _msgs.append(f"""
-                        <div style="margin:4px 0 4px 46px;padding:8px 12px;background:{_bg};border:1px solid {_border};border-left:3px solid {_accent};border-radius:8px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:{_txt_color};">
-                            <span style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;font-weight:800;opacity:0.7;">{_kind} · llamada</span>
-                            <span style="margin-left:8px;font-weight:700;">→ {_html.escape(_name)}</span>
-                            <span style="margin-left:8px;opacity:0.85;">{_html.escape(_input_str)}</span>
+                        <div style="margin:2px 0 2px 40px;padding:4px 0;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:#94A3B8;line-height:1.5;">
+                            <span style="color:#64748B;">→</span> <span style="color:#475569;font-weight:600;">{_html.escape(_short)}</span> <span style="color:#94A3B8;">{_html.escape(_input_str) if _input_str != '{{}}' else ''}</span>
                         </div>
                         """)
 
     if not _msgs:
         _chat_html = """
-        <div style="padding:44px 24px;background:white;border:1.5px dashed #CBD5E1;border-radius:14px;text-align:center;color:#64748B;">
-            <div style="font-size:48px;margin-bottom:12px;">💬</div>
-            <div style="font-size:16px;font-weight:700;color:#0F172A;">Listo para responder</div>
-            <div style="font-size:13px;margin:14px auto 0;max-width:640px;line-height:1.7;">
-                Preguntas <b style="color:#9F2241;">dashboard</b> (usa los datos de las pestañas ①–⑦):<br/>
-                <i style="color:#475569;">"¿A dónde va el presupuesto?"</i> ·
-                <i style="color:#475569;">"¿Cuánto cuesta Cablebús?"</i> ·
-                <i style="color:#475569;">"Top 5 programas en Apoyos sociales"</i> ·
-                <i style="color:#475569;">"Egresos de Iztapalapa en 2022"</i>
-                <br/><br/>
-                Preguntas <b style="color:#1D4ED8;">MCP</b> (datos adicionales):<br/>
-                <i style="color:#475569;">"Afluencia del Metro Línea 1"</i> ·
-                <i style="color:#475569;">"Robos en Iztapalapa en 2024"</i> ·
-                <i style="color:#475569;">"Calidad del aire PM2.5 en MER"</i> ·
-                <i style="color:#475569;">"Proveedores con 'construcción' en el nombre"</i>
+        <div style="padding:56px 24px;text-align:center;color:#94A3B8;">
+            <div style="font-size:14px;color:#64748B;line-height:2;">
+                <span style="display:inline-block;background:#F1F5F9;padding:4px 12px;border-radius:999px;margin:3px;font-size:12px;color:#475569;">¿A dónde va el presupuesto 2024?</span>
+                <span style="display:inline-block;background:#F1F5F9;padding:4px 12px;border-radius:999px;margin:3px;font-size:12px;color:#475569;">¿Cuánto cuesta Cablebús?</span>
+                <span style="display:inline-block;background:#F1F5F9;padding:4px 12px;border-radius:999px;margin:3px;font-size:12px;color:#475569;">Top 5 programas de Agua</span>
+                <span style="display:inline-block;background:#F1F5F9;padding:4px 12px;border-radius:999px;margin:3px;font-size:12px;color:#475569;">Egresos de Iztapalapa 2022</span>
+                <span style="display:inline-block;background:#F1F5F9;padding:4px 12px;border-radius:999px;margin:3px;font-size:12px;color:#475569;">Obras del ramo salud</span>
             </div>
         </div>
         """
     else:
         _chat_html = (
-            '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;'
-            'padding:16px 20px;max-height:620px;overflow-y:auto;">'
+            '<div style="border-top:1px solid #F1F5F9;border-bottom:1px solid #F1F5F9;'
+            'padding:14px 4px;max-height:620px;overflow-y:auto;">'
             f'{"".join(_msgs)}</div>'
         )
 
@@ -2356,38 +2300,17 @@ def _(
 
     _error = (
         mo.md(
-            f'<div style="margin:10px 0;padding:12px 16px;background:#FEF2F2;border:1px solid #FECACA;'
-            f'border-left:3px solid #DC2626;border-radius:8px;color:#7F1D1D;font-size:13px;line-height:1.5;">'
-            f'<b>⚠️ Error.</b> {_html.escape(_err)}'
-            f'</div>'
+            f'<div style="margin:10px 0;padding:10px 14px;background:#FEF2F2;border-left:3px solid #DC2626;'
+            f'border-radius:6px;color:#7F1D1D;font-size:12px;">{_html.escape(_err)}</div>'
         ) if _err else mo.md("")
-    )
-
-    _input_label = mo.md(
-        '<div style="font-size:11px;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;'
-        'font-weight:700;margin:14px 0 -2px;">Tu pregunta</div>'
-    )
-
-    _footer = mo.md(
-        '<div style="margin:14px 0 0;padding:14px 18px;background:#F8FAFC;border:1px solid #E2E8F0;'
-        'border-left:3px solid #94A3B8;border-radius:8px;font-size:12px;color:#475569;line-height:1.55;">'
-        '<b style="color:#0F172A;">Cómo funciona.</b> Claude Sonnet 4.6 recibe tu pregunta con 17 tools: '
-        '7 <b style="color:#9F2241;">dashboard_*</b> (leen <code>data/clean/</code>, <code>crosswalk/</code>, '
-        '<code>data/egresos_*.csv</code>, <code>rally_obras.csv</code>, <code>ingresos_main.csv</code>) y '
-        '10 <b style="color:#1D4ED8;">cdmx_*</b> del servidor MCP (<code>mcp/src/cdmx_data/</code>) que '
-        'consultan <a href="https://datos.cdmx.gob.mx" style="color:#9F2241;">datos.cdmx.gob.mx</a>. '
-        'El modelo itera hasta 8 llamadas a tools para producir la respuesta final.'
-        '</div>'
     )
 
     act_agente_content = mo.vstack([
         _hero,
         _chat,
         _error,
-        _input_label,
         agent_input,
         mo.hstack([agent_submit, agent_reset], justify="start", gap=1),
-        _footer,
     ])
     return (act_agente_content,)
 

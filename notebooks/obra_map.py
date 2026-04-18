@@ -167,6 +167,30 @@ def _(mo, raw):
     return alcaldia_filter, ciclo_filter, ramo_filter, status_filter
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        """
+        <div style="
+            margin: 10px 0 14px;
+            padding: 14px 16px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            color: #334155;
+            font-size: 13px;
+            line-height: 1.55;
+        ">
+        <b>Ruta narrativa del tablero</b><br>
+        1) <b>Panorama general:</b> tamaño de la cartera, ejecución y avance de proyectos.<br>
+        2) <b>Evidencia territorial:</b> dónde están las obras y cómo se distribuye la inversión.<br>
+        3) <b>Focos de atención:</b> hallazgos para priorizar seguimiento ciudadano.
+        </div>
+        """
+    )
+    return
+
+
 @app.cell
 def _(alcaldia_filter, ciclo_filter, pl, ramo_filter, raw, status_filter):
     df = raw
@@ -214,6 +238,8 @@ def _(df, fmt_int, fmt_mxn, mo, pl):
         """
 
     mo.md(f"""
+    ## Acto 1 · Panorama general
+
     <div style="display:flex;gap:14px;flex-wrap:wrap;margin:16px 0 22px;">
     {_kpi("Proyectos", fmt_int(_n), "#9F2241")}
     {_kpi("Inversión ejercida", fmt_mxn(_monto), "#00A489")}
@@ -229,6 +255,8 @@ def _(df, fmt_int, fmt_mxn, mo, pl):
 def _(mo):
     mo.md(
         """
+        ## Acto 2 · Evidencia territorial
+
         ### El mapa · explora proyecto por proyecto
 
         Cada punto es un proyecto. **El tamaño** indica el monto ejercido y **el color** la fuente federal.
@@ -457,7 +485,7 @@ def _(df, fmt_int, fmt_mxn, map_widget, mo, pl):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md("### ¿Cómo se reparte la inversión entre alcaldías?")
+    mo.md("### Distribución de la inversión entre alcaldías")
     return
 
 
@@ -514,7 +542,13 @@ def _(alcaldia_filter, df, fmt_mxn, go, pl):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md("### Hallazgos")
+    mo.md(
+        """
+        ## Acto 3 · Focos de atención
+
+        Hallazgos clave para priorizar seguimiento de ejecución y territorio.
+        """
+    )
     return
 
 

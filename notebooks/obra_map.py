@@ -31,39 +31,46 @@ def _(mo):
             personas se beneficiaron.
         </div>
         </div>
+@app.cell(hide_code=True)
+def _(df, fmt_int, fmt_mxn, mo, pl):
+    _n = df.height
+    _monto = df["monto_ejercido"].sum()
+    _alcs = df["desc_alcaldia"].n_unique()
+
+    _aprobado = df.with_columns(pl.col("monto_aprobado").cast(pl.Float64, strict=False))["monto_aprobado"].drop_nulls().sum()
+    _ejercido_sum = df.with_columns(pl.col("monto_ejercido").cast(pl.Float64, strict=False))["monto_ejercido"].drop_nulls().sum()
+    _ejecucion = f"{_ejercido_sum / _aprobado * 100:.1f}%" if _aprobado else "—"
+
+    _terminados = df.with_columns(pl.col("avance_fisico").cast(pl.Float64, strict=False)).filter(pl.col("avance_fisico") >= 95).height
+    _pct_terminados = f"{_terminados / _n * 100:.1f}%" if _n else "—"
+
+    def _kpi(label, value, accent="#9F2241"):
+        return f"""
         <div style="
-            margin: 8px 0 20px;
-            padding: 12px 18px;
-            background: #FEF3C7;
-            border-left: 4px solid #D97706;
-            border-radius: 8px;
-            color: #78350F;
-            font-size: 13px;
-            line-height: 1.5;
+            background: white;
+            border: 1px solid #E2E8F0;
+            border-left: 4px solid {accent};
+            border-radius: 10px;
+            padding: 18px 22px;
+            flex: 1;
+            min-width: 180px;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
         ">
-        <b>Datos 2013–2018.</b> Son los más recientes publicados por la CDMX con georreferencia
-        completa. Fuente: <a href="https://datos.cdmx.gob.mx/dataset/rally-como-van-las-obras-cdmx"
-        style="color:#78350F;text-decoration:underline;">Rally ¿Cómo van las obras? · Portal de Datos Abiertos CDMX</a>.
+            <div style="font-size:11px;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;">{label}</div>
+            <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:6px;letter-spacing:-0.5px;">{value}</div>
         </div>
         """
-    )
+
+    mo.md(f"""
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin:16px 0 22px;">
+    {_kpi("Proyectos", fmt_int(_n), "#9F2241")}
+    {_kpi("Inversión ejercida", fmt_mxn(_monto), "#00A489")}
+    {_kpi("Ejecución presupuestal", _ejecucion, "#00B7CD")}
+    {_kpi("Proyectos terminados", _pct_terminados, "#6C4A7E")}
+    {_kpi("Alcaldías con obra", fmt_int(_alcs), "#EC6730")}
+    </div>
+    """)
     return
-
-
-@app.cell
-def _():
-    import marimo as mo
-    from pathlib import Path
-    import polars as pl
-    import plotly.express as px
-    import plotly.graph_objects as go
-
-    DATA_DIR = Path(__file__).parent.parent / "data"
-    FONT = "Inter, -apple-system, system-ui, sans-serif"
-
-    RAMO_PALETTE = {
-        "Aportaciones Federales para Entidades Federativas y Municipios": "#9F2241",
-        "Provisiones Salariales y Económicas": "#EC6730",
         "Comunicaciones y Transportes": "#00B7CD",
         "Medio Ambiente y Recursos Naturales": "#00A489",
         "Salud": "#E3007E",

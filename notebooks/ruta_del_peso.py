@@ -1659,6 +1659,311 @@ def _(emblemas_search, fmt_mxn, mo, named_programs_df, pl):
 
 @app.cell(hide_code=True)
 def _(mo):
+    agent_input = mo.ui.text_area(
+        placeholder=(
+            "Pregúntame sobre los datos abiertos de CDMX…\n\n"
+            "Ej: ¿Cuál es la afluencia del Metro Línea 1 en 2024? · "
+            "¿Cuántas carpetas por robo en Iztapalapa en enero? · "
+            "Busca 'calidad del aire' · "
+            "Proveedores con 'construcción' en el nombre."
+        ),
+        full_width=True,
+        rows=3,
+    )
+    agent_submit = mo.ui.button(label="🤖 Preguntar", kind="success")
+    agent_reset = mo.ui.button(label="🗑️ Limpiar", kind="neutral")
+    return agent_input, agent_reset, agent_submit
+
+
+@app.cell
+def _(mo):
+    get_agent_history, set_agent_history = mo.state([])
+    get_agent_error, set_agent_error = mo.state(None)
+    get_submit_seen, set_submit_seen = mo.state(0)
+    get_reset_seen, set_reset_seen = mo.state(0)
+    return (
+        get_agent_error, get_agent_history, get_reset_seen, get_submit_seen,
+        set_agent_error, set_agent_history, set_reset_seen, set_submit_seen,
+    )
+
+
+@app.cell
+def _(
+    agent_input, agent_reset, agent_submit,
+    get_agent_history, get_reset_seen, get_submit_seen,
+    set_agent_error, set_agent_history, set_reset_seen, set_submit_seen,
+):
+    # Side-effect cell: runs the agent loop when submit is clicked.
+    # Button .value is a click count — we gate on count > last-seen.
+    import json
+    import os
+    import sys
+    import importlib.util as _iu
+    from pathlib import Path
+
+    # Reset?
+    if (agent_reset.value or 0) > get_reset_seen():
+        set_reset_seen(agent_reset.value or 0)
+        set_agent_history([])
+        set_agent_error(None)
+
+    # Submit?
+    _count = agent_submit.value or 0
+    if _count > get_submit_seen() and (agent_input.value or "").strip():
+        set_submit_seen(_count)
+        _question = agent_input.value.strip()
+        _api_key = os.environ.get("ANTHROPIC_API_KEY")
+
+        if not _api_key:
+            set_agent_error(
+                "ANTHROPIC_API_KEY no está configurada. "
+                "Expórtala antes de arrancar el notebook."
+            )
+        else:
+            try:
+                import anthropic
+            except ImportError:
+                anthropic = None
+                set_agent_error("Falta el paquete 'anthropic'. Corre `uv add anthropic`.")
+
+            _cdmx = None
+            _dispatch = None
+            if anthropic is not None:
+                _mcp_src = Path(__file__).parent.parent / "mcp" / "src"
+                if str(_mcp_src) not in sys.path:
+                    sys.path.insert(0, str(_mcp_src))
+                try:
+                    from cdmx_data import CDMX
+                    _spec = _iu.spec_from_file_location(
+                        "cdmx_mcp_server_mod",
+                        _mcp_src / "cdmx_data" / "mcp_server.py",
+                    )
+                    _mod = _iu.module_from_spec(_spec)
+                    _spec.loader.exec_module(_mod)
+                    _dispatch = _mod._dispatch
+                    _cdmx = CDMX()
+                except Exception as _e:
+                    set_agent_error(f"No pude inicializar cdmx-data: {_e}")
+
+            if _cdmx is not None and _dispatch is not None and anthropic is not None:
+                _TOOLS = [
+                    {"name": "cdmx_search", "description": "Busca datasets en el portal datos.cdmx.gob.mx",
+                     "input_schema": {"type": "object", "properties": {"query": {"type": "string"}, "max_results": {"type": "integer", "default": 10}}, "required": ["query"]}},
+                    {"name": "cdmx_catalog", "description": "Lista datasets del catálogo interno (filtro: movilidad, seguridad, aire, servicios, finanzas, geo)",
+                     "input_schema": {"type": "object", "properties": {"track": {"type": "string"}}}},
+                    {"name": "cdmx_fetch_resource", "description": "Descarga registros de un recurso CKAN por resource_id",
+                     "input_schema": {"type": "object", "properties": {"resource_id": {"type": "string"}, "max_records": {"type": "integer", "default": 100}}, "required": ["resource_id"]}},
+                    {"name": "cdmx_movilidad_metro", "description": "Afluencia diaria del Metro CDMX por línea y estación",
+                     "input_schema": {"type": "object", "properties": {"desde": {"type": "string", "description": "YYYY-MM-DD"}, "hasta": {"type": "string", "description": "YYYY-MM-DD"}, "linea": {"type": "string", "description": "Número de línea (1, 2, … o A)"}}}},
+                    {"name": "cdmx_seguridad_fgj", "description": "Carpetas de investigación de la FGJ CDMX",
+                     "input_schema": {"type": "object", "properties": {"alcaldia": {"type": "string"}, "delito_contiene": {"type": "string"}, "desde": {"type": "string"}, "hasta": {"type": "string"}}}},
+                    {"name": "cdmx_aire_calidad", "description": "Calidad del aire por estación SIMAT",
+                     "input_schema": {"type": "object", "properties": {"contaminante": {"type": "string", "description": "PM25, PM10, O3, NO2, CO, SO2"}, "estacion": {"type": "string"}}}},
+                    {"name": "cdmx_servicios_locatel", "description": "Solicitudes recibidas por Locatel *0311",
+                     "input_schema": {"type": "object", "properties": {"alcaldia": {"type": "string"}, "desde": {"type": "string"}, "hasta": {"type": "string"}}}},
+                    {"name": "cdmx_finanzas_proveedores", "description": "Padrón de proveedores del gobierno CDMX",
+                     "input_schema": {"type": "object", "properties": {"nombre_contiene": {"type": "string"}}}},
+                    {"name": "cdmx_geo_colonia_en_punto", "description": "Geocruce: la colonia que contiene el punto lat/lon",
+                     "input_schema": {"type": "object", "properties": {"lat": {"type": "number"}, "lon": {"type": "number"}}, "required": ["lat", "lon"]}},
+                    {"name": "cdmx_sql_remote", "description": "SQL read-only sobre CKAN. La tabla se referencia como '\"<resource_id>\"'",
+                     "input_schema": {"type": "object", "properties": {"sql": {"type": "string"}}, "required": ["sql"]}},
+                ]
+
+                _SYSTEM = (
+                    "Eres un asistente conversacional para el dashboard 'La ruta de tu peso' de CDMX. "
+                    "Tienes acceso a herramientas que consultan el portal de datos abiertos de la Ciudad "
+                    "(datos.cdmx.gob.mx) vía el servidor MCP cdmx-data. "
+                    "Responde brevemente en español, con cifras concretas, y cita el dataset o herramienta usada. "
+                    "Si la pregunta trata del presupuesto (reparto, aprobado vs ejercido, programas), el dashboard "
+                    "ya lo cubre en las pestañas I–VII — sugiere ir ahí cuando aplique, y si aún así quieres "
+                    "consultar, usa cdmx_fetch_resource o cdmx_sql_remote. "
+                    "Si una herramienta devuelve error o datos vacíos, no inventes — dilo."
+                )
+
+                _client = anthropic.Anthropic(api_key=_api_key)
+                _history = list(get_agent_history())
+                _history.append({"role": "user", "content": _question})
+
+                try:
+                    for _iter in range(6):
+                        _resp = _client.messages.create(
+                            model="claude-sonnet-4-6",
+                            max_tokens=2048,
+                            system=_SYSTEM,
+                            tools=_TOOLS,
+                            messages=_history,
+                        )
+                        _blocks = []
+                        for _b in _resp.content:
+                            if _b.type == "text":
+                                _blocks.append({"type": "text", "text": _b.text})
+                            elif _b.type == "tool_use":
+                                _blocks.append({"type": "tool_use", "id": _b.id, "name": _b.name, "input": _b.input})
+                        _history.append({"role": "assistant", "content": _blocks})
+
+                        if _resp.stop_reason != "tool_use":
+                            break
+
+                        _results = []
+                        for _b in _resp.content:
+                            if _b.type == "tool_use":
+                                try:
+                                    _r = _dispatch(_cdmx, _b.name, _b.input or {})
+                                    _text = json.dumps(_r, default=str, ensure_ascii=False)
+                                    if len(_text) > 8000:
+                                        _text = _text[:8000] + "…[truncado por longitud]"
+                                except Exception as _te:
+                                    _text = json.dumps({"error": str(_te)}, ensure_ascii=False)
+                                _results.append({"type": "tool_result", "tool_use_id": _b.id, "content": _text})
+                        _history.append({"role": "user", "content": _results})
+
+                    set_agent_history(_history)
+                    set_agent_error(None)
+                except Exception as _e:
+                    set_agent_error(f"Error llamando a Anthropic: {type(_e).__name__}: {_e}")
+    return
+
+
+@app.cell
+def _(
+    agent_input, agent_reset, agent_submit,
+    get_agent_error, get_agent_history, mo,
+):
+    # Render the conversational agent tab.
+    import json as _json
+    import os as _os
+
+    _history = get_agent_history()
+    _err = get_agent_error()
+    _has_key = bool(_os.environ.get("ANTHROPIC_API_KEY"))
+
+    _key_badge = (
+        '<span style="background:#DCFCE7;color:#166534;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.5px;">✓ API</span>'
+        if _has_key else
+        '<span style="background:#FEF2F2;color:#991B1B;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.5px;">⚠ sin API key</span>'
+    )
+
+    _hero = mo.md(f"""
+    <div style="padding:28px 34px;background:linear-gradient(135deg,#FDEBEE 0%,#FFF 55%,#FFF 100%);
+        border:1px solid #E2E8F0;border-radius:16px;margin-bottom:16px;
+        box-shadow:0 1px 3px rgba(15,23,42,0.03);">
+        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+            <div style="font-size:11px;color:#9F2241;letter-spacing:2px;text-transform:uppercase;font-weight:700;">⑧ Pregunta · asistente conversacional</div>
+            {_key_badge}
+        </div>
+        <div style="font-size:34px;font-weight:700;color:#0F172A;margin-top:10px;line-height:1.08;letter-spacing:-0.8px;">
+            Pregúntale al presupuesto
+        </div>
+        <div style="font-size:13px;color:#475569;margin:14px 0 0;line-height:1.55;max-width:860px;">
+            Claude Sonnet 4.6 conectado al servidor <b>cdmx-data</b> (MCP) — 10 herramientas que consultan
+            <a href="https://datos.cdmx.gob.mx" style="color:#9F2241;">datos.cdmx.gob.mx</a>: afluencia del Metro,
+            carpetas FGJ, calidad del aire, Locatel *0311, proveedores, geocruce por punto, SQL remoto, catálogo y búsqueda.
+        </div>
+    </div>
+    """)
+
+    _msgs = []
+    for _m in _history:
+        _role = _m["role"]
+        _content = _m["content"]
+        if _role == "user":
+            if isinstance(_content, str):
+                _msgs.append(f"""
+                <div style="display:flex;justify-content:flex-end;margin:12px 0;">
+                    <div style="max-width:76%;background:#9F2241;color:white;padding:11px 16px;border-radius:14px 14px 3px 14px;font-size:14px;line-height:1.5;">
+                        {_content}
+                    </div>
+                </div>
+                """)
+            else:
+                for _tr in _content:
+                    if isinstance(_tr, dict) and _tr.get("type") == "tool_result":
+                        _txt = _tr.get("content", "")
+                        _short = _txt[:340] + ("…" if len(_txt) > 340 else "")
+                        _msgs.append(f"""
+                        <div style="margin:4px 0 4px 48px;padding:8px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-left:3px solid #64748B;border-radius:8px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:#475569;line-height:1.5;white-space:pre-wrap;word-break:break-word;">
+                            <div style="font-size:9px;color:#94A3B8;letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:4px;">tool result</div>
+                            {_short}
+                        </div>
+                        """)
+        elif _role == "assistant":
+            if isinstance(_content, list):
+                for _b in _content:
+                    _t = _b.get("type") if isinstance(_b, dict) else None
+                    if _t == "text":
+                        _text = _b.get("text", "").strip()
+                        if _text:
+                            _msgs.append(f"""
+                            <div style="display:flex;justify-content:flex-start;margin:12px 0;">
+                                <div style="max-width:80%;background:white;border:1px solid #E2E8F0;padding:12px 16px;border-radius:14px 14px 14px 3px;font-size:14px;line-height:1.55;color:#0F172A;box-shadow:0 1px 2px rgba(15,23,42,0.03);">
+                                    {_text}
+                                </div>
+                            </div>
+                            """)
+                    elif _t == "tool_use":
+                        _input_str = _json.dumps(_b.get("input") or {}, ensure_ascii=False)
+                        if len(_input_str) > 160:
+                            _input_str = _input_str[:160] + "…"
+                        _msgs.append(f"""
+                        <div style="margin:4px 0 4px 48px;padding:7px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-left:3px solid #3B82F6;border-radius:8px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:#1E3A8A;">
+                            <span style="letter-spacing:1px;text-transform:uppercase;font-weight:700;">→ {_b.get('name','tool')}</span>  {_input_str}
+                        </div>
+                        """)
+
+    if not _msgs:
+        _chat_html = """
+        <div style="padding:42px 24px;background:white;border:1.5px dashed #CBD5E1;border-radius:14px;text-align:center;color:#64748B;">
+            <div style="font-size:44px;margin-bottom:10px;">💬</div>
+            <div style="font-size:15px;font-weight:700;color:#0F172A;">Aún no hay conversación</div>
+            <div style="font-size:12px;margin-top:10px;line-height:1.6;max-width:560px;margin-left:auto;margin-right:auto;">
+                Prueba: <i>"Afluencia del Metro Línea 1 en enero 2024"</i> ·
+                <i>"Carpetas FGJ por robo en Iztapalapa"</i> ·
+                <i>"Busca 'calidad del aire'"</i> ·
+                <i>"Proveedores con 'construcción' en el nombre"</i>
+            </div>
+        </div>
+        """
+    else:
+        _chat_html = (
+            '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;'
+            'padding:14px 18px;max-height:580px;overflow-y:auto;">'
+            f'{"".join(_msgs)}</div>'
+        )
+
+    _chat = mo.md(_chat_html)
+
+    _error = (
+        mo.md(
+            f'<div style="margin:10px 0;padding:12px 16px;background:#FEF2F2;border:1px solid #FECACA;'
+            f'border-left:3px solid #DC2626;border-radius:8px;color:#7F1D1D;font-size:13px;line-height:1.5;">'
+            f'<b>⚠️ Error.</b> {_err}'
+            f'</div>'
+        ) if _err else mo.md("")
+    )
+
+    _footer = mo.md(
+        '<div style="margin:14px 0 0;padding:14px 18px;background:#F8FAFC;border:1px solid #E2E8F0;'
+        'border-left:3px solid #94A3B8;border-radius:8px;font-size:12px;color:#475569;line-height:1.55;">'
+        '<b style="color:#0F172A;">Cómo funciona.</b> Claude Sonnet 4.6 recibe tu pregunta con acceso a 10 '
+        'herramientas definidas en <code>mcp/src/cdmx_data/mcp_server.py</code>. Cada tool consulta el '
+        'portal CKAN de <code>datos.cdmx.gob.mx</code> (o un CSV local si existe). Los resultados se '
+        'devuelven al modelo hasta producir la respuesta final — hasta 6 iteraciones.'
+        '</div>'
+    )
+
+    act_agente_content = mo.vstack([
+        _hero,
+        _chat,
+        _error,
+        agent_input,
+        mo.hstack([agent_submit, agent_reset], justify="start", gap=1),
+        _footer,
+    ])
+    return (act_agente_content,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
     step = mo.ui.tabs(
         {
             "① Flujo":        mo.md(""),
@@ -1668,6 +1973,7 @@ def _(mo):
             "⑤ Explora":      mo.md(""),
             "⑥ Ciudadano":    mo.md(""),
             "⑦ Emblemáticos": mo.md(""),
+            "⑧ Pregunta":     mo.md(""),
         },
         value="① Flujo",
     )
@@ -1678,7 +1984,8 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(
     act1_content, act2_content, act3_content, act4_content,
-    act_ciudadano_content, act_emblemas_content, act_flujo_content, step,
+    act_agente_content, act_ciudadano_content, act_emblemas_content,
+    act_flujo_content, step,
 ):
     _map = {
         "① Flujo":        act_flujo_content,
@@ -1688,6 +1995,7 @@ def _(
         "⑤ Explora":      act4_content,
         "⑥ Ciudadano":    act_ciudadano_content,
         "⑦ Emblemáticos": act_emblemas_content,
+        "⑧ Pregunta":     act_agente_content,
     }
     _map.get(step.value, act_flujo_content)
     return

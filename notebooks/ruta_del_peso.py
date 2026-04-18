@@ -2086,7 +2086,37 @@ def _(
     import json as _json
     import os as _os
     import html as _html
+    import re as _re
     from pathlib import Path as _Path
+
+    def _md_to_html(text: str) -> str:
+        """Convert Claude's (possibly-markdown) prose into safe inline HTML.
+        Table rows get flattened into ' · ' separated prose. Bold / italic /
+        code are converted to tags. Everything else is HTML-escaped.
+        """
+        t = _html.escape(text or "")
+        lines_out = []
+        for _ln in t.split("\n"):
+            _stripped = _ln.strip()
+            if _re.match(r"^\|[\s\-:|]+\|?$", _stripped):
+                continue
+            if _stripped.startswith("|") and _stripped.endswith("|"):
+                _cells = [c.strip() for c in _stripped.strip("|").split("|") if c.strip()]
+                if _cells:
+                    lines_out.append(" · ".join(_cells))
+                continue
+            lines_out.append(_ln)
+        t = "\n".join(lines_out)
+        t = _re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+        t = _re.sub(r"(?<!\*)\*([^*\n]+?)\*(?!\*)", r"<i>\1</i>", t)
+        t = _re.sub(
+            r"`([^`]+)`",
+            r'<code style="background:#F1F5F9;padding:1px 5px;border-radius:3px;font-size:0.92em;color:#475569;">\1</code>',
+            t,
+        )
+        t = t.replace("\n\n", "</p><p style='margin:8px 0 0;'>")
+        t = t.replace("\n", "<br/>")
+        return f"<p style='margin:0;'>{t}</p>"
 
     # Peek at .env for the key too — the handler cell loads it but we
     # want the badge to reflect reality before a first send.
@@ -2300,11 +2330,11 @@ def _(
                 if isinstance(_b, dict) and _b.get("type") == "text":
                     _text = _b.get("text", "").strip()
                     if _text:
-                        _text_html = _html.escape(_text).replace("\n\n", "</p><p style='margin:8px 0 0;'>").replace("\n", "<br/>")
+                        _text_html = _md_to_html(_text)
                         _msgs.append(f"""
                         <div style="display:flex;justify-content:flex-start;margin:10px 0 12px;">
                             <div style="max-width:82%;background:white;border:1px solid #E2E8F0;padding:11px 15px;border-radius:14px 14px 14px 3px;font-size:14px;line-height:1.55;color:#0F172A;">
-                                <p style="margin:0;">{_text_html}</p>
+                                {_text_html}
                             </div>
                         </div>
                         """)

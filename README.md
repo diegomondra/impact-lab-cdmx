@@ -8,6 +8,7 @@ The project uses official datasets from [datos.cdmx.gob.mx](https://datos.cdmx.g
 
 |Dashboard|Story|Source|
 |---|---|---|
+|`notebooks/producto_unico.py`|*Producto único integrado* — una sola experiencia con presupuesto + obra pública para demo y entrega final.|Presupuesto CDMX + Rally ¿Cómo van las obras?|
 |`notebooks/obra_map.py`|*¿Qué se construyó en tu calle?* — 23k georeferenced federal projects (2013-2018). Includes execution, completion, contractor, and territorial distribution.|Rally ¿Cómo van las obras?|
 |`notebooks/budget_dashboard.py`|*¿A dónde va el dinero público?* — budget allocation and execution by function, agency, SDG, and spending chapter. Prioritizes 2018-2019 cuts (with 2023-2024 as recent reference).|Presupuesto de egresos 2018/2019/2023/2024|
 |`notebooks/explore.py`|Generic CSV explorer — drop any CSV into `data/` and get instant charts.|—|
@@ -41,7 +42,7 @@ git clone git@github.com:diegomondra/impact-lab-cdmx.git
 cd impact-lab-cdmx
 uv sync                              # installs Python + all deps (~30s first time)
 bash scripts/download_data.sh        # downloads ~290MB of CDMX open data
-uv run marimo run notebooks/obra_map.py
+uv run marimo run notebooks/producto_unico.py
 ```
 
 Browser opens at **<http://localhost:2718>**.

@@ -1698,14 +1698,15 @@ def _(
     # Side-effect cell: runs the agent loop when submit is clicked.
     # Exposes 7 dashboard-backed tools (covering tabs I–VII) plus 10
     # MCP tools from cdmx-data (Metro, FGJ, aire, Locatel, CKAN, geocruce).
-    import json
-    import os
-    import sys
+    # All imports use underscore prefix so they don't collide with other cells.
+    import json as _json
+    import os as _os
+    import sys as _sys
     import importlib.util as _iu
-    from pathlib import Path
+    from pathlib import Path as _Path
 
     # Load .env from repo root if it exists (so ANTHROPIC_API_KEY etc. flow through).
-    _env_file = Path(__file__).parent.parent / ".env"
+    _env_file = _Path(__file__).parent.parent / ".env"
     if _env_file.exists():
         for _line in _env_file.read_text().splitlines():
             _line = _line.strip()
@@ -1714,8 +1715,8 @@ def _(
             _k, _v = _line.split("=", 1)
             _k = _k.strip()
             _v = _v.strip().strip('"').strip("'")
-            if _k and _k not in os.environ:
-                os.environ[_k] = _v
+            if _k and _k not in _os.environ:
+                _os.environ[_k] = _v
 
     if (agent_reset.value or 0) > get_reset_seen():
         set_reset_seen(agent_reset.value or 0)
@@ -1726,7 +1727,7 @@ def _(
     if _count > get_submit_seen() and (agent_input.value or "").strip():
         set_submit_seen(_count)
         _question = agent_input.value.strip()
-        _api_key = os.environ.get("ANTHROPIC_API_KEY")
+        _api_key = _os.environ.get("ANTHROPIC_API_KEY")
 
         if not _api_key:
             set_agent_error(
@@ -1742,9 +1743,9 @@ def _(
             _cdmx = None
             _mcp_dispatch = None
             if anthropic is not None:
-                _mcp_src = Path(__file__).parent.parent / "mcp" / "src"
-                if str(_mcp_src) not in sys.path:
-                    sys.path.insert(0, str(_mcp_src))
+                _mcp_src = _Path(__file__).parent.parent / "mcp" / "src"
+                if str(_mcp_src) not in _sys.path:
+                    _sys.path.insert(0, str(_mcp_src))
                 try:
                     from cdmx_data import CDMX
                     _spec = _iu.spec_from_file_location(
@@ -2029,11 +2030,11 @@ def _(
                                         _r = _dashboard_dispatch(_b.name, _b.input or {})
                                     else:
                                         _r = _mcp_dispatch(_cdmx, _b.name, _b.input or {})
-                                    _text = json.dumps(_r, default=str, ensure_ascii=False)
+                                    _text = _json.dumps(_r, default=str, ensure_ascii=False)
                                     if len(_text) > 8000:
                                         _text = _text[:8000] + "…[truncado]"
                                 except Exception as _te:
-                                    _text = json.dumps({"error": f"{type(_te).__name__}: {_te}"}, ensure_ascii=False)
+                                    _text = _json.dumps({"error": f"{type(_te).__name__}: {_te}"}, ensure_ascii=False)
                                 _results.append({"type": "tool_result", "tool_use_id": _b.id, "content": _text})
                         _history.append({"role": "user", "content": _results})
 

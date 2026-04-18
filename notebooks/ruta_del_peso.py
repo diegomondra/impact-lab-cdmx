@@ -215,6 +215,36 @@ def _(DATA_DIR, EGRESOS_FILE_MAP, pl, year_pick):
     return budget_col, egresos_df, has_ejercido
 
 
+@app.cell
+def _(DATA_DIR, EGRESOS_FILE_MAP, pl):
+    _parts = []
+    for _yr in sorted(EGRESOS_FILE_MAP.keys()):
+        _fname, _bcol_type, _ = EGRESOS_FILE_MAP[_yr]
+        _df = pl.read_csv(
+            DATA_DIR / _fname,
+            infer_schema_length=10_000,
+            null_values=["NA", ""],
+            truncate_ragged_lines=True,
+            ignore_errors=True,
+            encoding="utf8-lossy",
+            schema_overrides={
+                "monto_aprobado":   pl.Float64,
+                "monto_modificado": pl.Float64,
+                "monto_ejercido":   pl.Float64,
+            },
+        )
+        _bcol = "monto_modificado" if _bcol_type == "modificado" else "monto_aprobado"
+        _has_sp = "monto_ejercido" in _df.columns
+        _df = _df.with_columns([
+            pl.col(_bcol).fill_null(0).alias("_budget"),
+            (pl.col("monto_ejercido").fill_null(0) if _has_sp else pl.lit(0.0)).alias("_spent"),
+            pl.lit(_yr).alias("_year"),
+        ]).select(["_year", "desc_unidad_responsable", "desc_capitulo", "_budget", "_spent"])
+        _parts.append(_df)
+    egresos_all = pl.concat(_parts)
+    return (egresos_all,)
+
+
 @app.cell(hide_code=True)
 def _(egresos_df, mo, pl):
     _alcs = (
@@ -651,74 +681,212 @@ def _(alcaldia_pick, fmt_int, fmt_mxn, go, mo, pl, rally_raw, year_pick):
 
 @app.cell
 def _(
-    alcaldia_pick, egresos_df, fmt_mxn, has_ejercido, ingresos_raw, mo, pl,
-    year_pick,
+    alcaldia_pick, egresos_all, fmt_mxn, go, ingresos_raw, mo, pl, rally_raw,
 ):
-    _year = year_pick.value
+    _ing = ingresos_raw.to_pandas()
+    _ing_plan = (_ing[_ing["periodo"] == "Anual"]
+                 .groupby("ciclo")["monto_estimado"].sum()
+                 .rename("planeado"))
+    _ing_real = (_ing[_ing["periodo"] == "Cuenta Pública"]
+                 .groupby("ciclo")["monto_recaudado"].sum()
+                 .rename("recaudado"))
+    _ing_trend = _ing_plan.to_frame().join(_ing_real, how="outer").reset_index().sort_values("ciclo")
 
-    _ing = ingresos_raw.filter(
-        (pl.col("ciclo") == _year) & (pl.col("periodo").is_in(["Anual", "Cuenta Pública"]))
+    _fig1 = go.Figure()
+    _fig1.add_trace(go.Scatter(
+        x=_ing_trend["ciclo"], y=_ing_trend["planeado"],
+        mode="lines+markers", name="Planeado (Ley de Ingresos)",
+        line=dict(color="#CBD5E1", width=3, dash="dot"),
+        marker=dict(size=8),
+        hovertemplate="%{x}: %{customdata}<extra>Planeado</extra>",
+        customdata=[fmt_mxn(v) for v in _ing_trend["planeado"]],
+    ))
+    _fig1.add_trace(go.Scatter(
+        x=_ing_trend["ciclo"], y=_ing_trend["recaudado"],
+        mode="lines+markers", name="Recaudado (Cuenta Pública)",
+        line=dict(color="#9F2241", width=3),
+        marker=dict(size=10),
+        hovertemplate="%{x}: %{customdata}<extra>Recaudado</extra>",
+        customdata=[fmt_mxn(v) for v in _ing_trend["recaudado"].fillna(0)],
+    ))
+    _fig1.update_layout(
+        height=320,
+        margin=dict(l=10, r=10, t=30, b=30),
+        title=dict(text="<b>Ingresos CDMX · 2018–2024</b>",
+                   font=dict(size=14, family="Inter", color="#0F172A"), x=0.01),
+        xaxis=dict(showgrid=False, dtick=1, title=""),
+        yaxis=dict(showgrid=True, gridcolor="#F1F5F9", tickformat=".2s", title=""),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, system-ui, sans-serif", size=12),
+        legend=dict(orientation="h", yanchor="bottom", y=1.04, x=1, xanchor="right",
+                    bgcolor="rgba(0,0,0,0)"),
+        hovermode="x unified",
     )
-    _eg = egresos_df
-    if alcaldia_pick.value != "Toda la CDMX":
-        _eg = _eg.filter(pl.col("desc_unidad_responsable") == alcaldia_pick.value)
 
-    _ing_total = (
-        _ing.filter(pl.col("periodo") == "Cuenta Pública")["monto_recaudado"].sum()
-        or _ing.filter(pl.col("periodo") == "Anual")["monto_estimado"].sum()
+    _eg = egresos_all
+    _alc_label = alcaldia_pick.value
+    if _alc_label != "Toda la CDMX":
+        _eg = _eg.filter(pl.col("desc_unidad_responsable") == _alc_label)
+    _eg_trend = (
+        _eg.group_by("_year").agg([
+            pl.col("_budget").sum().alias("budget"),
+            pl.col("_spent").sum().alias("spent"),
+        ]).sort("_year").to_pandas()
     )
-    _eg_plan = _eg["_budget"].sum()
-    _eg_spent = _eg["_spent"].sum()
-    _pct_spent = (_eg_spent / _ing_total * 100) if _ing_total and has_ejercido else 0
 
-    act4_content = mo.md(f"""
-    <div style="padding:28px 32px;background:white;border:1px solid #E2E8F0;border-radius:14px;">
+    _fig2 = go.Figure()
+    _fig2.add_trace(go.Bar(
+        x=_eg_trend["_year"], y=_eg_trend["budget"],
+        name="Presupuesto (modificado / aprobado)",
+        marker=dict(color="#E2E8F0"),
+        hovertemplate="%{x}: %{customdata}<extra>Presupuesto</extra>",
+        customdata=[fmt_mxn(v) for v in _eg_trend["budget"]],
+    ))
+    _fig2.add_trace(go.Bar(
+        x=_eg_trend["_year"], y=_eg_trend["spent"],
+        name="Ejercido",
+        marker=dict(color="#9F2241"),
+        hovertemplate="%{x}: %{customdata}<extra>Ejercido</extra>",
+        customdata=[fmt_mxn(v) for v in _eg_trend["spent"]],
+    ))
+    _exec_pcts = [
+        (s / b * 100) if b > 0 and s > 0 else None
+        for b, s in zip(_eg_trend["budget"], _eg_trend["spent"])
+    ]
+    _fig2.add_trace(go.Scatter(
+        x=_eg_trend["_year"], y=_eg_trend["budget"],
+        mode="text",
+        text=[f"{p:.0f}%" if p is not None else "" for p in _exec_pcts],
+        textposition="top center",
+        textfont=dict(size=11, color="#059669", family="Inter"),
+        showlegend=False, hoverinfo="skip", cliponaxis=False,
+    ))
+    _fig2.update_layout(
+        barmode="overlay",
+        height=340,
+        margin=dict(l=10, r=10, t=30, b=30),
+        title=dict(text=f"<b>Egresos · {_alc_label} · 2018–2024</b>",
+                   font=dict(size=14, family="Inter", color="#0F172A"), x=0.01),
+        xaxis=dict(showgrid=False, dtick=1, title=""),
+        yaxis=dict(showgrid=True, gridcolor="#F1F5F9", tickformat=".2s", title=""),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, system-ui, sans-serif", size=12),
+        legend=dict(orientation="h", yanchor="bottom", y=1.04, x=1, xanchor="right",
+                    bgcolor="rgba(0,0,0,0)"),
+        hovermode="x unified",
+        bargap=0.35,
+    )
+
+    _rally = rally_raw.filter(
+        pl.col("ciclo").is_between(2013, 2017)
+        & pl.col("rfc_contratista").is_not_null()
+        & (pl.col("rfc_contratista") != "")
+        & ~pl.col("rfc_contratista").str.to_lowercase().str.contains("no reportó")
+        & (pl.col("monto_ejercido") > 0)
+    )
+    if _alc_label != "Toda la CDMX":
+        _bare = _alc_label.replace("Alcaldía ", "").strip()
+        _rally = _rally.filter(pl.col("desc_alcaldia").str.contains(_bare, literal=True))
+
+    _top5 = (
+        _rally.group_by("rfc_contratista")
+              .agg(pl.col("monto_ejercido").sum().alias("m"))
+              .sort("m", descending=True)
+              .head(5)["rfc_contratista"].to_list()
+    )
+    _rally_trend = (
+        _rally.filter(pl.col("rfc_contratista").is_in(_top5))
+              .group_by(["ciclo", "rfc_contratista"])
+              .agg([
+                  pl.col("monto_ejercido").sum().alias("monto"),
+                  pl.col("contratista").mode().first().alias("nombre"),
+              ])
+              .sort(["ciclo", "rfc_contratista"])
+              .to_pandas()
+    )
+
+    _line_palette = ["#9F2241", "#E3007E", "#EC6730", "#00A489", "#00B7CD"]
+    _fig3 = go.Figure()
+    if len(_rally_trend):
+        for _i, _rfc in enumerate(_top5):
+            _sub = _rally_trend[_rally_trend["rfc_contratista"] == _rfc]
+            _name = str(_sub["nombre"].iloc[0] if len(_sub) else _rfc)[:38] or _rfc
+            _fig3.add_trace(go.Scatter(
+                x=_sub["ciclo"], y=_sub["monto"],
+                mode="lines+markers",
+                name=f"{_i+1}. {_name}",
+                line=dict(color=_line_palette[_i % len(_line_palette)], width=2.5),
+                marker=dict(size=8),
+                hovertemplate=f"<b>{_name}</b><br>%{{x}}: %{{customdata}}<extra></extra>",
+                customdata=[fmt_mxn(v) for v in _sub["monto"]],
+            ))
+    else:
+        _fig3.add_annotation(
+            text="Sin contratos con RFC para esta alcaldía en 2013–2017",
+            showarrow=False, x=0.5, y=0.5, xref="paper", yref="paper",
+            font=dict(size=13, color="#64748B"),
+        )
+
+    _fig3.update_layout(
+        height=360,
+        margin=dict(l=10, r=10, t=30, b=30),
+        title=dict(text=f"<b>Top 5 contratistas · {_alc_label} · 2013–2017</b>",
+                   font=dict(size=14, family="Inter", color="#0F172A"), x=0.01),
+        xaxis=dict(showgrid=False, dtick=1, title=""),
+        yaxis=dict(showgrid=True, gridcolor="#F1F5F9", tickformat=".2s", title=""),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, system-ui, sans-serif", size=12),
+        legend=dict(orientation="h", yanchor="top", y=-0.1, x=0, xanchor="left",
+                    bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
+        hovermode="x unified",
+    )
+
+    _intro = mo.md("""
+    <div style="padding:22px 24px 18px;background:white;border:1px solid #E2E8F0;border-radius:14px;margin-bottom:14px;">
         <div style="font-size:11px;color:#64748B;letter-spacing:1.8px;text-transform:uppercase;font-weight:600;">Acto IV · Explora</div>
         <div style="font-size:26px;font-weight:700;color:#0F172A;margin-top:4px;line-height:1.15;letter-spacing:-0.5px;">
-            {_year} · {alcaldia_pick.value}
+            Tendencias multi-año
         </div>
-        <div style="font-size:13px;color:#475569;margin:12px 0 22px;line-height:1.55;">
-            Combina el selector de <b>Año</b> y <b>Alcaldía</b> de arriba. Los 3 actos anteriores
-            (Entran · Se prometen · Aterrizan) responden instantáneamente.
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
-            <div style="padding:16px;background:#FEF2F2;border-radius:10px;border-left:3px solid #9F2241;">
-                <div style="font-size:10px;letter-spacing:1.5px;color:#7F1D1D;text-transform:uppercase;font-weight:600;">① Ingresos</div>
-                <div style="font-size:22px;font-weight:700;color:#0F172A;margin-top:4px;">{fmt_mxn(_ing_total)}</div>
-                <div style="font-size:11px;color:#475569;">Ingresos CDMX totales</div>
-            </div>
-            <div style="padding:16px;background:#FEF3C7;border-radius:10px;border-left:3px solid #D97706;">
-                <div style="font-size:10px;letter-spacing:1.5px;color:#78350F;text-transform:uppercase;font-weight:600;">② Egresos planeados</div>
-                <div style="font-size:22px;font-weight:700;color:#0F172A;margin-top:4px;">{fmt_mxn(_eg_plan)}</div>
-                <div style="font-size:11px;color:#475569;">Presupuesto {alcaldia_pick.value}</div>
-            </div>
-            <div style="padding:16px;background:#F0FDF4;border-radius:10px;border-left:3px solid #059669;">
-                <div style="font-size:10px;letter-spacing:1.5px;color:#14532D;text-transform:uppercase;font-weight:600;">Ejercido</div>
-                <div style="font-size:22px;font-weight:700;color:#0F172A;margin-top:4px;">{fmt_mxn(_eg_spent) if has_ejercido else '—'}</div>
-                <div style="font-size:11px;color:#475569;">{_pct_spent:.1f}% del ingreso total</div>
-            </div>
-        </div>
-        <div style="margin-top:20px;font-size:13px;color:#475569;line-height:1.55;">
-            💡 <b>Tip:</b> compara años recientes (2022–2023) con años más antiguos (2018–2019)
-            para ver cómo ha crecido el presupuesto. Cambia de alcaldía para ver la distribución
-            territorial.
+        <div style="font-size:13px;color:#475569;margin:10px 0 0;line-height:1.55;">
+            Cómo evolucionaron los tres actos en el tiempo. El selector de <b>Alcaldía</b>
+            afecta los egresos y los contratistas; los ingresos siempre son para toda la CDMX.
         </div>
     </div>
     """)
+
+    act4_content = mo.vstack([
+        _intro,
+        mo.ui.plotly(_fig1),
+        mo.ui.plotly(_fig2),
+        mo.ui.plotly(_fig3),
+    ])
     return (act4_content,)
 
 
 @app.cell(hide_code=True)
-def _(act1_content, act2_content, act3_content, act4_content, mo):
-    mo.ui.tabs(
+def _(mo):
+    step = mo.ui.tabs(
         {
-            "① Entran":       act1_content,
-            "② Se prometen":  act2_content,
-            "③ Aterrizan":    act3_content,
-            "④ Explora":      act4_content,
+            "① Entran":       mo.md(""),
+            "② Se prometen":  mo.md(""),
+            "③ Aterrizan":    mo.md(""),
+            "④ Explora":      mo.md(""),
         },
         value="① Entran",
     )
+    step
+    return (step,)
+
+
+@app.cell(hide_code=True)
+def _(act1_content, act2_content, act3_content, act4_content, step):
+    _map = {
+        "① Entran":       act1_content,
+        "② Se prometen":  act2_content,
+        "③ Aterrizan":    act3_content,
+        "④ Explora":      act4_content,
+    }
+    _map.get(step.value, act1_content)
     return
 
 

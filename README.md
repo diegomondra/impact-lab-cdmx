@@ -1,79 +1,108 @@
 # impact-lab-cdmx
 
-Interactive dashboards for CDMX public data. Built at Claude Mexico City Lab 2026.
+Interactive dashboards for Ciudad de México public data — built at Claude Mexico City Lab 2026.
 
-## Dashboards
+Three dashboards tell three stories with official data from [datos.cdmx.gob.mx](https://datos.cdmx.gob.mx):
 
-- **`notebooks/obra_map.py`** — *¿Qué se construyó en tu calle?* Interactive map of 23k georeferenced federal investment projects (2013–2018). Click any dot for project detail: cost flow, beneficiaries, contractor, contract URL.
-- **`notebooks/budget_dashboard.py`** — *¿A dónde va el dinero público?* CDMX budget allocation by purpose, agency, SDG, capítulo. Plan-vs-actual execution view.
-- **`notebooks/explore.py`** — Generic CSV explorer for any dataset dropped into `data/`.
+| Dashboard | Story | Source |
+|---|---|---|
+| `notebooks/obra_map.py` | *¿Qué se construyó en tu calle?* — 23k georeferenced federal projects (2013–2018). Click any dot to see cost flow, beneficiaries, contractor, and contract PDF. | Rally ¿Cómo van las obras? |
+| `notebooks/budget_dashboard.py` | *¿A dónde va el dinero público?* — CDMX budget by purpose, agency, SDG, and chapter. Plan-vs-actual execution view. | Presupuesto de egresos 2023/2024 |
+| `notebooks/explore.py` | Generic CSV explorer — drop any CSV into `data/` and get instant charts. | — |
 
-## Quick start
+---
+
+## Prerequisites
+
+- **[uv](https://docs.astral.sh/uv/getting-started/installation/)** (Python package manager — one-line install)
+- **bash** (on Windows: use Git Bash, which ships with [Git for Windows](https://git-scm.com/download/win))
+- **git**, **curl**
+
+You don't need to install Python yourself — `uv` handles that.
+
+## Run it (3 commands)
 
 ```bash
-uv sync                                    # install deps
-bash scripts/download_data.sh              # fetch CDMX datasets (~85MB)
-uv run marimo run notebooks/obra_map.py    # interactive map of federal projects
-# other dashboards:
+git clone git@github.com:diegomondra/impact-lab-cdmx.git
+cd impact-lab-cdmx
+uv sync                              # installs Python + all deps (~30s first time)
+bash scripts/download_data.sh        # downloads ~85MB of CDMX open data
+uv run marimo run notebooks/obra_map.py
+```
+
+Browser opens at **http://localhost:2718**.
+
+To run a different dashboard, swap the last line:
+
+```bash
 uv run marimo run notebooks/budget_dashboard.py
-uv run marimo edit notebooks/obra_map.py   # reactive editing mode
-```
-
-Browser opens at `http://localhost:2718`.
-
-## Stack
-
-- **[Marimo](https://marimo.io)** — reactive Python notebooks that run as apps. Git-friendly (pure `.py` files).
-- **[Polars](https://pola.rs)** — fast DataFrame library (use `pandas` too if you prefer).
-- **[Plotly](https://plotly.com/python/)** — interactive, publication-quality charts.
-- **[Altair](https://altair-viz.github.io)** — grammar-of-graphics for declarative viz.
-- **[uv](https://docs.astral.sh/uv/)** — fast Python package manager.
-
-## Setup
-
-```bash
-uv sync
-```
-
-That creates `.venv/` and installs everything. First run takes ~30s; afterwards it's instant.
-
-## Run a notebook
-
-Edit mode (reactive, live-coding):
-
-```bash
-uv run marimo edit notebooks/explore.py
-```
-
-App mode (clean UI, read-only, shareable):
-
-```bash
 uv run marimo run notebooks/explore.py
 ```
 
-Browser opens at `http://localhost:2718`.
+### Edit mode (live-coding)
 
-## Add data
+```bash
+uv run marimo edit notebooks/obra_map.py
+```
 
-Drop CSVs into `data/`. They're gitignored by default — add exceptions in `.gitignore` if you want to commit a specific file.
+Changes to the code re-run reactively in the browser. This is how you iterate on the dashboard.
 
-## New notebook
+### Port already in use?
+
+```bash
+uv run marimo run notebooks/obra_map.py --port 2719
+```
+
+---
+
+## Add your own data
+
+Drop a CSV into `data/`. Everything in `data/` is gitignored except the README, so sensitive files stay local.
+
+Open `notebooks/explore.py` and pick your file from the dropdown.
+
+## New notebook from scratch
 
 ```bash
 uv run marimo new notebooks/my_analysis.py
 ```
 
+---
+
+## Stack
+
+- **[Marimo](https://marimo.io)** — reactive Python notebooks that double as web apps. Pure `.py` files, git-friendly.
+- **[Polars](https://pola.rs)** — fast DataFrames.
+- **[Plotly](https://plotly.com/python/)** — interactive charts and maps.
+- **[uv](https://docs.astral.sh/uv/)** — Python + dependency management.
+
 ## Project structure
 
 ```
 .
-├── data/                       # CSVs (gitignored — run scripts/download_data.sh)
+├── data/                           # CSVs (gitignored — run scripts/download_data.sh)
 ├── notebooks/
-│   ├── obra_map.py             # Interactive map of federal projects in CDMX
-│   ├── budget_dashboard.py     # CDMX budget allocation dashboard
-│   └── explore.py              # Generic CSV explorer
+│   ├── obra_map.py                 # Map of federal projects in CDMX
+│   ├── budget_dashboard.py         # CDMX budget allocation dashboard
+│   └── explore.py                  # Generic CSV explorer
 ├── scripts/
-│   └── download_data.sh        # Fetches CDMX datasets
-├── pyproject.toml
+│   └── download_data.sh            # Fetches CDMX open data (~85MB)
+├── pyproject.toml                  # Dependencies + marimo config
 └── README.md
 ```
+
+---
+
+## Troubleshooting
+
+**`uv: command not found`** — install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS/Linux) or [see Windows instructions](https://docs.astral.sh/uv/getting-started/installation/).
+
+**Download script fails** — the CDMX portal is sometimes slow. Re-run `bash scripts/download_data.sh`. The curl commands will resume/overwrite.
+
+**Output is too large error** — the map renders 23k points. The `output_max_bytes` cap is set in `pyproject.toml`. If you hit it, raise the value or add a filter to reduce points.
+
+**Data looks old** — the Rally dataset (obra_map.py) covers 2013–2018; this is what CDMX publishes with georeferencing. The dashboard banner makes this explicit.
+
+---
+
+*Licensed under the terms of the underlying public datasets. See [datos.cdmx.gob.mx](https://datos.cdmx.gob.mx) for source licensing.*

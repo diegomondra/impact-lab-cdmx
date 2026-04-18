@@ -190,6 +190,7 @@ def _(DATA_DIR, pl):
             _ROOT / "crosswalk" / "crosswalk.csv",
             infer_schema_length=20_000,
             null_values=["NA", ""],
+            truncate_ragged_lines=True,
             ignore_errors=True,
         )
     except Exception:
@@ -200,6 +201,7 @@ def _(DATA_DIR, pl):
             _ROOT / "crosswalk" / "named_programs_2024.csv",
             infer_schema_length=10_000,
             null_values=["NA", ""],
+            truncate_ragged_lines=True,
             ignore_errors=True,
         ).with_columns(
             pl.col("monto_aprobado_mxn").cast(pl.Float64, strict=False).fill_null(0)

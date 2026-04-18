@@ -16,6 +16,22 @@ echo "Downloading 2018 public account (actual spending)..."
 curl -sSL -o egresos_2018_cp.csv \
   "https://datos.cdmx.gob.mx/dataset/7a8820f2-3bea-4c69-8b20-1d01b1a99a6a/resource/1ea90350-d41d-48ae-b848-613490d6e16c/download/egresos_2018_cp.csv"
 
+echo "Downloading 2019 approved budget..."
+curl -sSL -o egresos_2019_aprobado.csv \
+  "https://datos.cdmx.gob.mx/dataset/8dc52617-63f6-4bfd-9fae-54239675c6d0/resource/9a6f53d7-1751-4ae4-8bd8-d31807be7789/download/egresos_2019_aprobado.csv"
+
+echo "Downloading 2019 Q1 actual spending..."
+curl -sSL -o egresos_2019_01_trimestre.csv \
+  "https://datos.cdmx.gob.mx/dataset/8dc52617-63f6-4bfd-9fae-54239675c6d0/resource/7212363b-c655-4ff6-9207-3cac5a2d8236/download/egresos_2019_01_trimestre.csv"
+
+echo "Downloading 2019 Q2 actual spending..."
+curl -sSL -o egresos_2019_02_trimestre.csv \
+  "https://datos.cdmx.gob.mx/dataset/8dc52617-63f6-4bfd-9fae-54239675c6d0/resource/58dbd930-63b8-497c-9770-76e2ebf38bc3/download/egresos_2019_02_trimestre.csv"
+
+echo "Downloading 2019 Q3 actual spending..."
+curl -sSL -o egresos_2019_03_trimestre.csv \
+  "https://datos.cdmx.gob.mx/dataset/8dc52617-63f6-4bfd-9fae-54239675c6d0/resource/53ab63bd-728a-4ebe-8c92-d64f66514e27/download/egresos_2019_03_trimestre.csv"
+
 echo "Downloading 2024 approved budget..."
 curl -sSL -o egresos_2024_aprobado.csv \
   "https://datos.cdmx.gob.mx/dataset/3a6cba97-adb1-4f35-9df1-984cc3657aca/resource/7fa1da81-531c-477c-93db-7580bc1c7ad0/download/egresos_2024_aprobado.csv"

@@ -31,6 +31,20 @@ def _(mo):
             <a href="https://datos.cdmx.gob.mx" style="color:#FFCCD5; text-decoration: underline;">Portal de Datos Abiertos</a>.
         </div>
         </div>
+        <div style="
+            margin: 8px 0 20px;
+            padding: 12px 18px;
+            background: #FEF3C7;
+            border-left: 4px solid #D97706;
+            border-radius: 8px;
+            color: #78350F;
+            font-size: 13px;
+            line-height: 1.5;
+        ">
+        <b>Alineación temporal del análisis.</b> Para mantener comparabilidad con el mapa de obra
+        georreferenciada (2013-2018), este tablero prioriza los cortes 2018-2019 y conserva
+        2023-2024 como referencia más reciente.
+        </div>
         """
     )
     return
@@ -121,6 +135,10 @@ def _(DATA_DIR, pl):
     files = {
         "2018 · aprobado": DATA_DIR / "egresos_2018_aprobado.csv",
         "2018 · cuenta pública": DATA_DIR / "egresos_2018_cp.csv",
+        "2019 · aprobado": DATA_DIR / "egresos_2019_aprobado.csv",
+        "2019 Q1 · avance trimestral": DATA_DIR / "egresos_2019_01_trimestre.csv",
+        "2019 Q2 · avance trimestral": DATA_DIR / "egresos_2019_02_trimestre.csv",
+        "2019 Q3 · avance trimestral": DATA_DIR / "egresos_2019_03_trimestre.csv",
         "2023 Q3 · avance trimestral": DATA_DIR / "egresos_2023_03_trimestre.csv",
         "2024 · aprobado": DATA_DIR / "egresos_2024_aprobado.csv",
         "2023 · aprobado": DATA_DIR / "egresos_2023_aprobado.csv",

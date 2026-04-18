@@ -1757,11 +1757,28 @@ def _(
                     set_agent_error(f"No pude inicializar cdmx-data: {_e}")
 
             # ─── Dashboard tools dispatch (tabs I–VII data) ───
+            _EGRESOS_FILES = {
+                2018: "egresos_2018_cp.csv",
+                2019: "egresos_2019_cp.csv",
+                2020: "egresos_2020_cp.csv",
+                2021: "egresos_2021_cp.csv",
+                2022: "egresos_2022_cp.csv",
+                2023: "egresos_2023_03_trimestre.csv",
+                2024: "egresos_2024_aprobado.csv",
+            }
+            _DATA_DIR_AGENT = _Path(__file__).parent.parent / "data"
+
             def _dashboard_dispatch(name, args):
                 if name == "dashboard_budget_summary":
                     if budget_tree_df is None:
                         return {"error": "budget_tree.parquet no disponible"}
+                    _avail = sorted({int(y) for y in budget_tree_df["year"].unique().to_list()})
                     _y = args.get("year")
+                    if _y is not None and int(_y) not in _avail:
+                        return {
+                            "error": f"El budget_tree solo tiene año(s) {_avail}. Para otros años usa dashboard_egresos_aggregate (cubre 2018–2024 vía los CSVs oficiales).",
+                            "available_years": _avail,
+                        }
                     _df = budget_tree_df.filter(pl.col("level") == 1)
                     if _y is not None:
                         _df = _df.filter(pl.col("year") == int(_y))
@@ -1779,10 +1796,16 @@ def _(
                 if name == "dashboard_budget_drill":
                     if budget_tree_df is None:
                         return {"error": "budget_tree.parquet no disponible"}
+                    _avail = sorted({int(y) for y in budget_tree_df["year"].unique().to_list()})
                     _cat = args.get("citizen_category")
                     if not _cat:
                         return {"error": "Falta 'citizen_category'. Usa primero dashboard_budget_summary."}
                     _y = args.get("year")
+                    if _y is not None and int(_y) not in _avail:
+                        return {
+                            "error": f"El budget_tree solo tiene año(s) {_avail}. No hay desglose por categoría ciudadana para year={_y}.",
+                            "available_years": _avail,
+                        }
                     _top_n = int(args.get("top_n") or 20)
                     _df = budget_tree_df.filter(
                         (pl.col("level") == 2) & (pl.col("citizen_category") == _cat)
@@ -1821,30 +1844,52 @@ def _(
                     }
 
                 if name == "dashboard_egresos_aggregate":
-                    if egresos_all is None:
-                        return {"error": "egresos_all no disponible"}
-                    _y = args.get("year")
                     _dim = args.get("group_by") or "desc_funcion"
                     _valid = {"desc_funcion", "desc_unidad_responsable", "desc_capitulo"}
                     if _dim not in _valid:
                         return {"error": f"group_by inválido. Usa uno de {sorted(_valid)}"}
+                    _y = args.get("year")
                     _top_n = int(args.get("top_n") or 15)
-                    _df = egresos_all
-                    if _y is not None:
-                        _df = _df.filter(pl.col("_year") == int(_y))
+                    _years = [int(_y)] if _y is not None else list(_EGRESOS_FILES.keys())
+                    # Read CSVs directly with Latin-1 (CDMX files are cp1252/latin1,
+                    # not UTF-8; reading as utf8-lossy mangles accented characters).
+                    import pandas as _pd
+                    _parts = []
+                    for _yr in _years:
+                        _fn = _EGRESOS_FILES.get(_yr)
+                        if not _fn:
+                            continue
+                        _path = _DATA_DIR_AGENT / _fn
+                        if not _path.exists():
+                            continue
+                        _pdf = _pd.read_csv(_path, encoding="latin1", low_memory=False)
+                        _bcol_candidates = [c for c in ("monto_modificado", "monto_aprobado") if c in _pdf.columns]
+                        _bcol = _bcol_candidates[0] if _bcol_candidates else "monto_aprobado"
+                        if "monto_modificado" in _pdf.columns:
+                            _sum_mod = _pd.to_numeric(_pdf["monto_modificado"], errors="coerce").fillna(0).sum()
+                            if _sum_mod > 0:
+                                _bcol = "monto_modificado"
+                        _pdf["_budget"] = _pd.to_numeric(_pdf[_bcol], errors="coerce").fillna(0)
+                        _pdf["_spent"] = _pd.to_numeric(_pdf.get("monto_ejercido", 0), errors="coerce").fillna(0)
+                        _pdf["_year"] = _yr
+                        if _dim not in _pdf.columns:
+                            continue
+                        _parts.append(_pdf[[_dim, "_budget", "_spent", "_year"]])
+                    if not _parts:
+                        return {"error": f"No hay CSVs disponibles para year={args.get('year')} o group_by={_dim}"}
+                    _all_pdf = _pd.concat(_parts, ignore_index=True)
                     _agg = (
-                        _df.group_by(_dim)
-                           .agg([
-                               pl.col("_budget").sum().alias("monto_aprobado"),
-                               pl.col("_spent").sum().alias("monto_ejercido"),
-                           ])
-                           .sort("monto_aprobado", descending=True)
-                           .head(_top_n)
+                        _all_pdf.groupby(_dim, dropna=False)
+                               .agg(monto_aprobado=("_budget", "sum"),
+                                    monto_ejercido=("_spent", "sum"))
+                               .reset_index()
+                               .sort_values("monto_aprobado", ascending=False)
+                               .head(_top_n)
                     )
                     return {
                         "year": _y, "group_by": _dim,
-                        "source": "data/egresos_{2018..2024}_{cp|aprobado|trimestre}.csv",
-                        "records": _agg.to_dicts(),
+                        "source": f"data/egresos_{_y or '{2018..2024}'}_*.csv (latin1)",
+                        "records": _agg.to_dict(orient="records"),
                     }
 
                 if name == "dashboard_ingresos":
@@ -2229,48 +2274,32 @@ def _(
     </div>
     """)
 
+    # Only render the human-facing turns: user prompt + assistant final text.
+    # Tool calls and tool results stay hidden — they're internal machinery.
     _msgs = []
     for _m in _history:
         _role = _m["role"]
         _content = _m["content"]
-        if _role == "user":
-            if isinstance(_content, str):
-                _text_escaped = _html.escape(_content).replace("\n", "<br/>")
-                _msgs.append(f"""
-                <div style="display:flex;justify-content:flex-end;margin:14px 0 10px;">
-                    <div style="max-width:78%;background:#9F2241;color:white;padding:11px 15px;border-radius:14px 14px 3px 14px;font-size:14px;line-height:1.5;">
-                        {_text_escaped}
-                    </div>
+        if _role == "user" and isinstance(_content, str):
+            _text_escaped = _html.escape(_content).replace("\n", "<br/>")
+            _msgs.append(f"""
+            <div style="display:flex;justify-content:flex-end;margin:14px 0 10px;">
+                <div style="max-width:78%;background:#9F2241;color:white;padding:11px 15px;border-radius:14px 14px 3px 14px;font-size:14px;line-height:1.5;">
+                    {_text_escaped}
                 </div>
-                """)
-            elif isinstance(_content, list):
-                for _tr in _content:
-                    if isinstance(_tr, dict) and _tr.get("type") == "tool_result":
-                        _msgs.append(_render_tool_result(_tr.get("content", "")))
-        elif _role == "assistant":
-            if isinstance(_content, list):
-                for _b in _content:
-                    _t = _b.get("type") if isinstance(_b, dict) else None
-                    if _t == "text":
-                        _text = _b.get("text", "").strip()
-                        if _text:
-                            _text_html = _html.escape(_text).replace("\n\n", "</p><p style='margin:8px 0 0;'>").replace("\n", "<br/>")
-                            _msgs.append(f"""
-                            <div style="display:flex;justify-content:flex-start;margin:10px 0 12px;">
-                                <div style="max-width:82%;background:white;border:1px solid #E2E8F0;padding:11px 15px;border-radius:14px 14px 14px 3px;font-size:14px;line-height:1.55;color:#0F172A;">
-                                    <p style="margin:0;">{_text_html}</p>
-                                </div>
-                            </div>
-                            """)
-                    elif _t == "tool_use":
-                        _name = _b.get("name", "tool")
-                        _short = _name.replace("dashboard_", "").replace("cdmx_", "")
-                        _input_str = _json.dumps(_b.get("input") or {}, ensure_ascii=False)
-                        if len(_input_str) > 140:
-                            _input_str = _input_str[:140] + "…"
+            </div>
+            """)
+        elif _role == "assistant" and isinstance(_content, list):
+            for _b in _content:
+                if isinstance(_b, dict) and _b.get("type") == "text":
+                    _text = _b.get("text", "").strip()
+                    if _text:
+                        _text_html = _html.escape(_text).replace("\n\n", "</p><p style='margin:8px 0 0;'>").replace("\n", "<br/>")
                         _msgs.append(f"""
-                        <div style="margin:2px 0 2px 40px;padding:4px 0;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:#94A3B8;line-height:1.5;">
-                            <span style="color:#64748B;">→</span> <span style="color:#475569;font-weight:600;">{_html.escape(_short)}</span> <span style="color:#94A3B8;">{_html.escape(_input_str) if _input_str != '{{}}' else ''}</span>
+                        <div style="display:flex;justify-content:flex-start;margin:10px 0 12px;">
+                            <div style="max-width:82%;background:white;border:1px solid #E2E8F0;padding:11px 15px;border-radius:14px 14px 14px 3px;font-size:14px;line-height:1.55;color:#0F172A;">
+                                <p style="margin:0;">{_text_html}</p>
+                            </div>
                         </div>
                         """)
 

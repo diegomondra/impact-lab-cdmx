@@ -78,11 +78,11 @@ def _():
             return "—"
         v = float(v)
         if v >= 1e9:
-            return f"${v/1e9:,.2f} mmdp"
+            return f"${v / 1e9:,.2f} mmdp"
         if v >= 1e6:
-            return f"${v/1e6:,.1f} mdp"
+            return f"${v / 1e6:,.1f} mdp"
         if v >= 1e3:
-            return f"${v/1e3:,.0f} k"
+            return f"${v / 1e3:,.0f} k"
         return f"${v:,.0f}"
 
     def fmt_int(v):
@@ -103,15 +103,17 @@ def _(DATA_DIR, pl):
         ignore_errors=True,
     )
 
-    raw = raw.with_columns([
-        pl.col("latitud").cast(pl.Float64, strict=False),
-        pl.col("longitud").cast(pl.Float64, strict=False),
-        pl.col("monto_aprobado").fill_null(0),
-        pl.col("monto_ejercido").fill_null(0),
-        pl.col("monto_pagado").fill_null(0),
-        pl.col("avance_fisico").fill_null(0),
-        pl.col("poblacion_beneficiada").fill_null(0),
-    ]).filter(
+    raw = raw.with_columns(
+        [
+            pl.col("latitud").cast(pl.Float64, strict=False),
+            pl.col("longitud").cast(pl.Float64, strict=False),
+            pl.col("monto_aprobado").fill_null(0),
+            pl.col("monto_ejercido").fill_null(0),
+            pl.col("monto_pagado").fill_null(0),
+            pl.col("avance_fisico").fill_null(0),
+            pl.col("poblacion_beneficiada").fill_null(0),
+        ]
+    ).filter(
         pl.col("latitud").is_not_null()
         & pl.col("longitud").is_not_null()
         & (pl.col("latitud").is_between(19.0, 19.7))
@@ -137,7 +139,8 @@ def _(mo, raw):
         label="Ramo federal",
     )
     ciclo_filter = mo.ui.range_slider(
-        start=min(_ciclos), stop=max(_ciclos),
+        start=min(_ciclos),
+        stop=max(_ciclos),
         value=(min(_ciclos), max(_ciclos)),
         step=1,
         label="Año",
@@ -157,7 +160,9 @@ def _(mo, raw):
 
     mo.hstack(
         [alcaldia_filter, ramo_filter, ciclo_filter, status_filter],
-        justify="start", gap=1.5, wrap=True,
+        justify="start",
+        gap=1.5,
+        wrap=True,
     )
     return alcaldia_filter, ciclo_filter, ramo_filter, status_filter
 
@@ -185,7 +190,7 @@ def _(alcaldia_filter, ciclo_filter, pl, ramo_filter, raw, status_filter):
 def _(df, fmt_int, fmt_mxn, mo):
     _n = df.height
     _monto = df["monto_ejercido"].sum()
-    _benef = df["poblacion_beneficiada"].sum()
+    _contratistas = df["contratista"].drop_nulls().n_unique()
     _alcs = df["desc_alcaldia"].n_unique()
 
     def _kpi(label, value, accent="#9F2241"):
@@ -209,7 +214,7 @@ def _(df, fmt_int, fmt_mxn, mo):
     <div style="display:flex;gap:14px;flex-wrap:wrap;margin:16px 0 22px;">
     {_kpi("Proyectos", fmt_int(_n), "#9F2241")}
     {_kpi("Inversión ejercida", fmt_mxn(_monto), "#00A489")}
-    {_kpi("Personas beneficiadas", fmt_int(_benef), "#00B7CD")}
+    {_kpi("Contratistas únicos", fmt_int(_contratistas), "#00B7CD")}
     {_kpi("Alcaldías con obra", fmt_int(_alcs), "#EC6730")}
     </div>
     """)
@@ -233,18 +238,37 @@ def _(mo):
 def _(RAMO_PALETTE, df, fmt_int, fmt_mxn, go, mo, pl, px):
     import math
 
-    _pdf = df.select([
-        "id", "latitud", "longitud", "desc_ramo",
-        "monto_ejercido", "nombre_proyecto",
-        "desc_alcaldia", "desc_localidad",
-        "poblacion_beneficiada", "avance_fisico", "ciclo",
-    ]).to_pandas().copy()
+    _pdf = (
+        df.select(
+            [
+                "id",
+                "latitud",
+                "longitud",
+                "desc_ramo",
+                "monto_ejercido",
+                "nombre_proyecto",
+                "desc_alcaldia",
+                "desc_localidad",
+                "poblacion_beneficiada",
+                "avance_fisico",
+                "ciclo",
+            ]
+        )
+        .to_pandas()
+        .copy()
+    )
 
     _pdf["desc_ramo"] = _pdf["desc_ramo"].fillna("Sin clasificar")
     _pdf["_name"] = _pdf["nombre_proyecto"].fillna("(sin nombre)").str.slice(0, 90)
 
     def _hover(row):
-        _place = " · ".join([s for s in [row["desc_alcaldia"], row["desc_localidad"]] if isinstance(s, str) and s])
+        _place = " · ".join(
+            [
+                s
+                for s in [row["desc_alcaldia"], row["desc_localidad"]]
+                if isinstance(s, str) and s
+            ]
+        )
         _monto = fmt_mxn(row["monto_ejercido"])
         _avance = f"{row['avance_fisico']:.0f}%" if row["avance_fisico"] else "—"
         _benef = fmt_int(row["poblacion_beneficiada"])
@@ -255,15 +279,19 @@ def _(RAMO_PALETTE, df, fmt_int, fmt_mxn, go, mo, pl, px):
             f"Beneficiarios {_benef}<br>"
             f"<span style='color:#9F2241'>{row['desc_ramo']}</span>"
         )
+
     _pdf["_h"] = _pdf.apply(_hover, axis=1)
-    _pdf["_size"] = _pdf["monto_ejercido"].apply(lambda v: max(math.sqrt(max(v, 0)) / 700, 4))
+    _pdf["_size"] = _pdf["monto_ejercido"].apply(
+        lambda v: max(math.sqrt(max(v, 0)) / 700, 4)
+    )
 
     _ramos_present = sorted(_pdf["desc_ramo"].unique())
     _color_seq = [RAMO_PALETTE.get(r, "#94A3B8") for r in _ramos_present]
 
     _fig = px.scatter_map(
         _pdf,
-        lat="latitud", lon="longitud",
+        lat="latitud",
+        lon="longitud",
         color="desc_ramo",
         color_discrete_sequence=_color_seq,
         size="_size",
@@ -282,10 +310,13 @@ def _(RAMO_PALETTE, df, fmt_int, fmt_mxn, go, mo, pl, px):
         margin=dict(l=0, r=0, t=0, b=0),
         legend=dict(
             orientation="v",
-            yanchor="top", y=0.99,
-            xanchor="left", x=0.01,
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01,
             bgcolor="rgba(255,255,255,0.92)",
-            bordercolor="#E2E8F0", borderwidth=1,
+            bordercolor="#E2E8F0",
+            borderwidth=1,
             font=dict(size=11, family="Inter"),
             title=dict(text="<b>Ramo federal</b>", font=dict(size=12)),
             itemsizing="constant",
@@ -329,15 +360,21 @@ def _(df, fmt_int, fmt_mxn, map_widget, mo, pl):
     else:
         _proj = df.filter(pl.col("id") == _selected_ids[0]).to_pandas().iloc[0]
 
-        _status_color = "#059669" if _proj["avance_fisico"] >= 95 else (
-            "#D97706" if _proj["avance_fisico"] >= 25 else "#DC2626"
+        _status_color = (
+            "#059669"
+            if _proj["avance_fisico"] >= 95
+            else ("#D97706" if _proj["avance_fisico"] >= 25 else "#DC2626")
         )
-        _status_label = "Terminado" if _proj["avance_fisico"] >= 95 else (
-            "En curso" if _proj["avance_fisico"] >= 25 else "Rezagado"
+        _status_label = (
+            "Terminado"
+            if _proj["avance_fisico"] >= 95
+            else ("En curso" if _proj["avance_fisico"] >= 25 else "Rezagado")
         )
 
         _contract_link = ""
-        if isinstance(_proj.get("url_contrato"), str) and _proj["url_contrato"].startswith("http"):
+        if isinstance(_proj.get("url_contrato"), str) and _proj[
+            "url_contrato"
+        ].startswith("http"):
             _contract_link = (
                 f'<a href="{_proj["url_contrato"]}" target="_blank" '
                 'style="color:#9F2241;text-decoration:underline;font-weight:500;">ver contrato ↗</a>'
@@ -362,10 +399,10 @@ def _(df, fmt_int, fmt_mxn, map_widget, mo, pl):
             <div style="display:flex;align-items:start;justify-content:space-between;gap:20px;">
                 <div style="flex:1;">
                     <div style="font-size:20px;font-weight:700;color:#0F172A;letter-spacing:-0.3px;line-height:1.3;">
-                        {_proj['nombre_proyecto'] or '(sin nombre)'}
+                        {_proj["nombre_proyecto"] or "(sin nombre)"}
                     </div>
                     <div style="margin-top:6px;font-size:13px;color:#64748B;">
-                        {_proj.get('desc_alcaldia','')} · {_proj.get('desc_localidad','')} · {_proj.get('direccion_proyecto','') or ''}
+                        {_proj.get("desc_alcaldia", "")} · {_proj.get("desc_localidad", "")} · {_proj.get("direccion_proyecto", "") or ""}
                     </div>
                 </div>
                 <div style="
@@ -374,7 +411,7 @@ def _(df, fmt_int, fmt_mxn, map_widget, mo, pl):
                     font-weight:600;font-size:12px;letter-spacing:0.5px;text-transform:uppercase;
                     white-space:nowrap;
                 ">
-                    {_status_label} · {_proj['avance_fisico']:.0f}%
+                    {_status_label} · {_proj["avance_fisico"]:.0f}%
                 </div>
             </div>
 
@@ -382,28 +419,28 @@ def _(df, fmt_int, fmt_mxn, map_widget, mo, pl):
                         gap:16px;margin-top:20px;padding-top:18px;border-top:1px solid #F1F5F9;">
                 <div>
                     <div style="font-size:10px;letter-spacing:1.2px;color:#64748B;text-transform:uppercase;font-weight:600;">Aprobado</div>
-                    <div style="font-size:17px;font-weight:600;color:#0F172A;margin-top:3px;">{fmt_mxn(_proj['monto_aprobado'])}</div>
+                    <div style="font-size:17px;font-weight:600;color:#0F172A;margin-top:3px;">{fmt_mxn(_proj["monto_aprobado"])}</div>
                 </div>
                 <div>
                     <div style="font-size:10px;letter-spacing:1.2px;color:#64748B;text-transform:uppercase;font-weight:600;">Ejercido</div>
-                    <div style="font-size:17px;font-weight:600;color:#9F2241;margin-top:3px;">{fmt_mxn(_proj['monto_ejercido'])}</div>
+                    <div style="font-size:17px;font-weight:600;color:#9F2241;margin-top:3px;">{fmt_mxn(_proj["monto_ejercido"])}</div>
                 </div>
                 <div>
                     <div style="font-size:10px;letter-spacing:1.2px;color:#64748B;text-transform:uppercase;font-weight:600;">Pagado</div>
-                    <div style="font-size:17px;font-weight:600;color:#0F172A;margin-top:3px;">{fmt_mxn(_proj['monto_pagado'])}</div>
+                    <div style="font-size:17px;font-weight:600;color:#0F172A;margin-top:3px;">{fmt_mxn(_proj["monto_pagado"])}</div>
                 </div>
                 <div>
                     <div style="font-size:10px;letter-spacing:1.2px;color:#64748B;text-transform:uppercase;font-weight:600;">Beneficiarios</div>
-                    <div style="font-size:17px;font-weight:600;color:#0F172A;margin-top:3px;">{fmt_int(_proj['poblacion_beneficiada'])}</div>
+                    <div style="font-size:17px;font-weight:600;color:#0F172A;margin-top:3px;">{fmt_int(_proj["poblacion_beneficiada"])}</div>
                 </div>
                 <div>
                     <div style="font-size:10px;letter-spacing:1.2px;color:#64748B;text-transform:uppercase;font-weight:600;">Fuente</div>
-                    <div style="font-size:13px;font-weight:500;color:#0F172A;margin-top:3px;line-height:1.35;">{_proj.get('desc_ramo','—')}</div>
+                    <div style="font-size:13px;font-weight:500;color:#0F172A;margin-top:3px;line-height:1.35;">{_proj.get("desc_ramo", "—")}</div>
                 </div>
                 <div>
                     <div style="font-size:10px;letter-spacing:1.2px;color:#64748B;text-transform:uppercase;font-weight:600;">Contratista</div>
                     <div style="font-size:13px;font-weight:500;color:#0F172A;margin-top:3px;line-height:1.35;">
-                        {_proj.get('contratista') or '—'}{' · ' + _contract_link if _contract_link else ''}
+                        {_proj.get("contratista") or "—"}{" · " + _contract_link if _contract_link else ""}
                     </div>
                 </div>
             </div>
@@ -424,25 +461,30 @@ def _(mo):
 def _(alcaldia_filter, df, fmt_mxn, go, pl):
     _alc = (
         df.group_by("desc_alcaldia")
-          .agg([
-              pl.col("monto_ejercido").sum().alias("monto"),
-              pl.len().alias("proyectos"),
-          ])
-          .sort("monto", descending=True)
-          .to_pandas()
+        .agg(
+            [
+                pl.col("monto_ejercido").sum().alias("monto"),
+                pl.len().alias("proyectos"),
+            ]
+        )
+        .sort("monto", descending=True)
+        .to_pandas()
     )
     _alc["desc_alcaldia"] = _alc["desc_alcaldia"].fillna("Sin alcaldía")
     _alc = _alc.iloc[::-1].reset_index(drop=True)
     _alc["label"] = _alc["monto"].apply(fmt_mxn)
 
     _selected = set(alcaldia_filter.value or [])
-    _colors = ["#9F2241" if a in _selected else "#E2E8F0" for a in _alc["desc_alcaldia"]]
+    _colors = [
+        "#9F2241" if a in _selected else "#E2E8F0" for a in _alc["desc_alcaldia"]
+    ]
     if not _selected:
         _colors = ["#9F2241"] * len(_alc)
 
     _fig = go.Figure(
         go.Bar(
-            x=_alc["monto"], y=_alc["desc_alcaldia"],
+            x=_alc["monto"],
+            y=_alc["desc_alcaldia"],
             orientation="h",
             marker=dict(color=_colors),
             text=_alc["label"],
@@ -485,13 +527,19 @@ def _(df, fmt_int, fmt_mxn, mo, pl):
         _done_n = df.filter(pl.col("avance_fisico") >= 95).height
 
         _top_ramo = (
-            df.group_by("desc_ramo").agg(pl.col("monto_ejercido").sum())
-              .sort("monto_ejercido", descending=True).head(1).to_pandas()
+            df.group_by("desc_ramo")
+            .agg(pl.col("monto_ejercido").sum())
+            .sort("monto_ejercido", descending=True)
+            .head(1)
+            .to_pandas()
         )
 
         _top_alc = (
-            df.group_by("desc_alcaldia").agg(pl.col("monto_ejercido").sum())
-              .sort("monto_ejercido", descending=True).head(1).to_pandas()
+            df.group_by("desc_alcaldia")
+            .agg(pl.col("monto_ejercido").sum())
+            .sort("monto_ejercido", descending=True)
+            .head(1)
+            .to_pandas()
         )
 
         def _card(emoji, title, body, tone="#0F172A"):
@@ -505,37 +553,45 @@ def _(df, fmt_int, fmt_mxn, mo, pl):
 
         _cards = []
         _pct_done = (_done_n / df.height * 100) if df.height else 0
-        _cards.append(_card(
-            "✅",
-            "Tasa de terminación",
-            f"<b>{_pct_done:.0f}%</b> de {fmt_int(df.height)} proyectos llegaron a ≥95% de avance físico.",
-        ))
+        _cards.append(
+            _card(
+                "✅",
+                "Tasa de terminación",
+                f"<b>{_pct_done:.0f}%</b> de {fmt_int(df.height)} proyectos llegaron a ≥95% de avance físico.",
+            )
+        )
 
         if _stalled_n:
-            _cards.append(_card(
-                "⚠️",
-                "Proyectos rezagados",
-                f"<b>{fmt_int(_stalled_n)}</b> proyectos con menos de 25% de avance acumulan "
-                f"<b>{fmt_mxn(_stalled_monto)}</b> ejercidos.",
-                tone="#B91C1C",
-            ))
+            _cards.append(
+                _card(
+                    "⚠️",
+                    "Proyectos rezagados",
+                    f"<b>{fmt_int(_stalled_n)}</b> proyectos con menos de 25% de avance acumulan "
+                    f"<b>{fmt_mxn(_stalled_monto)}</b> ejercidos.",
+                    tone="#B91C1C",
+                )
+            )
 
         if len(_top_ramo):
             _tr = _top_ramo.iloc[0]
-            _cards.append(_card(
-                "🏦",
-                "Principal fuente federal",
-                f"<b>{_tr['desc_ramo']}</b> concentra <b>{fmt_mxn(_tr['monto_ejercido'])}</b> "
-                f"({_tr['monto_ejercido']/_total*100:.0f}% del total).",
-            ))
+            _cards.append(
+                _card(
+                    "🏦",
+                    "Principal fuente federal",
+                    f"<b>{_tr['desc_ramo']}</b> concentra <b>{fmt_mxn(_tr['monto_ejercido'])}</b> "
+                    f"({_tr['monto_ejercido'] / _total * 100:.0f}% del total).",
+                )
+            )
 
         if len(_top_alc):
             _ta = _top_alc.iloc[0]
-            _cards.append(_card(
-                "📍",
-                "Alcaldía con mayor inversión",
-                f"<b>{_ta['desc_alcaldia']}</b> recibió <b>{fmt_mxn(_ta['monto_ejercido'])}</b>.",
-            ))
+            _cards.append(
+                _card(
+                    "📍",
+                    "Alcaldía con mayor inversión",
+                    f"<b>{_ta['desc_alcaldia']}</b> recibió <b>{fmt_mxn(_ta['monto_ejercido'])}</b>.",
+                )
+            )
 
         mo.md(
             f'<div style="display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 24px;">{"".join(_cards)}</div>'

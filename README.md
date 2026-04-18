@@ -4,17 +4,19 @@ Interactive dashboards for CDMX public data. Built at Claude Mexico City Lab 202
 
 ## Dashboards
 
-- **`notebooks/budget_dashboard.py`** — *¿A dónde va el dinero público?* Budget allocation by purpose, agency, SDG alignment, and economic classification. Data from [datos.cdmx.gob.mx](https://datos.cdmx.gob.mx).
+- **`notebooks/obra_map.py`** — *¿Qué se construyó en tu calle?* Interactive map of 23k georeferenced federal investment projects (2013–2018). Click any dot for project detail: cost flow, beneficiaries, contractor, contract URL.
+- **`notebooks/budget_dashboard.py`** — *¿A dónde va el dinero público?* CDMX budget allocation by purpose, agency, SDG, capítulo. Plan-vs-actual execution view.
 - **`notebooks/explore.py`** — Generic CSV explorer for any dataset dropped into `data/`.
 
 ## Quick start
 
 ```bash
-uv sync                                 # install deps
-bash scripts/download_data.sh           # fetch CDMX budget CSVs (~50MB)
-uv run marimo run notebooks/budget_dashboard.py   # app mode
-# or
-uv run marimo edit notebooks/budget_dashboard.py  # reactive editing
+uv sync                                    # install deps
+bash scripts/download_data.sh              # fetch CDMX datasets (~85MB)
+uv run marimo run notebooks/obra_map.py    # interactive map of federal projects
+# other dashboards:
+uv run marimo run notebooks/budget_dashboard.py
+uv run marimo edit notebooks/obra_map.py   # reactive editing mode
 ```
 
 Browser opens at `http://localhost:2718`.
@@ -67,6 +69,7 @@ uv run marimo new notebooks/my_analysis.py
 .
 ├── data/                       # CSVs (gitignored — run scripts/download_data.sh)
 ├── notebooks/
+│   ├── obra_map.py             # Interactive map of federal projects in CDMX
 │   ├── budget_dashboard.py     # CDMX budget allocation dashboard
 │   └── explore.py              # Generic CSV explorer
 ├── scripts/

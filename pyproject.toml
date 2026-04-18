@@ -18,3 +18,6 @@ dependencies = [
 
 [tool.uv]
 dev-dependencies = []
+
+[tool.marimo.runtime]
+output_max_bytes = 25_000_000

@@ -29,6 +29,10 @@ __marimo__/
 data/*
 !data/.gitkeep
 !data/README.md
+# Agent 1 ↔ Agent 2 handoff (2026-04-18): commit the clean parquet contract so
+# the UI can boot even if datos.cdmx.gob.mx is unreachable. Raw CSVs stay out.
+!data/clean/
+!data/clean/**
 
 # Outputs
 outputs/

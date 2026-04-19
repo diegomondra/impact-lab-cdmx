@@ -1713,7 +1713,7 @@ def _(
             _k, _v = _line.split("=", 1)
             _k = _k.strip()
             _v = _v.strip().strip('"').strip("'")
-            if _k and _k not in _os.environ:
+            if _k and not _os.environ.get(_k):
                 _os.environ[_k] = _v
 
     # mo.ui.run_button.value is True ONLY on the single render after click,
@@ -2135,7 +2135,7 @@ def _(
                 _k, _v = _line.split("=", 1)
                 _k = _k.strip()
                 _v = _v.strip().strip('"').strip("'")
-                if _k and _k not in _os.environ:
+                if _k and not _os.environ.get(_k):
                     _os.environ[_k] = _v
 
     _history = get_agent_history()

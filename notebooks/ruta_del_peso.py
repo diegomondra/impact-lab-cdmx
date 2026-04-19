@@ -1973,61 +1973,47 @@ def _(
             if _cdmx is not None and _mcp_dispatch is not None and anthropic is not None:
                 _DASHBOARD_TOOLS = [
                     {"name": "dashboard_budget_summary",
-                     "description": "RESUMEN DEL PRESUPUESTO CDMX por 16 categorías ciudadanas (Agua, Transporte, Seguridad, Salud, Educación, Apoyos sociales, etc.) — datos de la pestaña ⑥ Ciudadano. Devuelve Level-1 con monto_aprobado y 'de cada 100 pesos'. Usa esta tool para preguntas tipo '¿a dónde va el presupuesto?' / '¿cuánto se gasta en X?' / 'reparto por categoría'.",
-                     "input_schema": {"type": "object", "properties": {"year": {"type": "integer", "description": "2018–2024"}}}},
+                     "description": "Presupuesto por 16 categorías ciudadanas. Solo year=2024.",
+                     "input_schema": {"type": "object", "properties": {"year": {"type": "integer"}}}},
                     {"name": "dashboard_budget_drill",
-                     "description": "DETALLE DE UNA CATEGORÍA — lista los programas presupuestarios dentro de una categoría ciudadana (ej. Agua → 'Operación SACMEX', 'Sectorización Iztapalapa'…). Datos de la pestaña ⑥. Requiere 'citizen_category' (una de las 16). Devuelve top_n programas con display_name, monto, % de la categoría y rationale editorial.",
-                     "input_schema": {"type": "object", "properties": {"citizen_category": {"type": "string", "description": "ej. 'Agua', 'Transporte público', 'Salud', 'Apoyos sociales', 'Gobierno y administración', 'Deuda', 'Otros'"}, "year": {"type": "integer"}, "top_n": {"type": "integer", "default": 20}}, "required": ["citizen_category"]}},
+                     "description": "Programas dentro de una categoría ciudadana. Solo year=2024.",
+                     "input_schema": {"type": "object", "properties": {"citizen_category": {"type": "string"}, "year": {"type": "integer"}, "top_n": {"type": "integer", "default": 20}}, "required": ["citizen_category"]}},
                     {"name": "dashboard_named_programs",
-                     "description": "PROGRAMAS EMBLEMÁTICOS con nombre propio (Cablebús L3, Utopías, Pilares, Mi Beca, Altépetl, Cosecha de Lluvia, Comedores, Sí al Desarme…) — datos de la pestaña ⑦ Emblemáticos. Fuente: Paquete Económico 2024 PDFs. Estos programas NO aparecen como desc_programa_presupuestario en la CSV oficial. Usa esta tool cuando pregunten por un nombre específico.",
-                     "input_schema": {"type": "object", "properties": {"query": {"type": "string", "description": "filtra por subcadena en display_name / ente_ejecutor / section. Omite para ver todos."}, "top_n": {"type": "integer", "default": 20}}}},
+                     "description": "Programas emblemáticos 2024 extraídos del Paquete Económico (Cablebús, Utopías, Pilares, Mi Beca, Altépetl, Comedores…).",
+                     "input_schema": {"type": "object", "properties": {"query": {"type": "string"}, "top_n": {"type": "integer", "default": 20}}}},
                     {"name": "dashboard_egresos_aggregate",
-                     "description": "AGREGADO DE EGRESOS (tabs ① Flujo / ③ Se prometen / ⑤ Explora). Agrupa las CSV oficiales de Cuenta Pública 2018–2022 + Q3 trimestral 2023 + aprobado 2024 por función, unidad responsable, o capítulo. Devuelve monto_aprobado vs monto_ejercido por dimensión.",
-                     "input_schema": {"type": "object", "properties": {"year": {"type": "integer", "description": "2018–2024"}, "group_by": {"type": "string", "enum": ["desc_funcion", "desc_unidad_responsable", "desc_capitulo"], "default": "desc_funcion"}, "top_n": {"type": "integer", "default": 15}}}},
+                     "description": "Egresos 2018–2024 agrupados por función / unidad responsable / capítulo. Aprobado vs ejercido.",
+                     "input_schema": {"type": "object", "properties": {"year": {"type": "integer"}, "group_by": {"type": "string", "enum": ["desc_funcion", "desc_unidad_responsable", "desc_capitulo"], "default": "desc_funcion"}, "top_n": {"type": "integer", "default": 15}}}},
                     {"name": "dashboard_ingresos",
-                     "description": "INGRESOS CDMX (tab ② Entran). Agrupa la Ley de Ingresos + Cuenta Pública por bucket (Impuestos locales, Federal participaciones+aportaciones, Derechos y productos, Sector paraestatal, Financiamientos, Otros) o por rubro/concepto.",
-                     "input_schema": {"type": "object", "properties": {"ciclo": {"type": "integer", "description": "2018–2024"}, "periodo": {"type": "string", "enum": ["Anual", "Cuenta Pública"], "description": "Anual = planeado en Ley de Ingresos. Cuenta Pública = recaudado real."}, "group_by": {"type": "string", "enum": ["_bucket", "desc_rubro", "desc_concepto", "desc_tipo_recurso_clase"], "default": "_bucket"}, "top_n": {"type": "integer", "default": 20}}}},
+                     "description": "Ingresos CDMX. periodo='Anual' (planeado) o 'Cuenta Pública' (recaudado).",
+                     "input_schema": {"type": "object", "properties": {"ciclo": {"type": "integer"}, "periodo": {"type": "string", "enum": ["Anual", "Cuenta Pública"]}, "group_by": {"type": "string", "enum": ["_bucket", "desc_rubro", "desc_concepto", "desc_tipo_recurso_clase"], "default": "_bucket"}, "top_n": {"type": "integer", "default": 20}}}},
                     {"name": "dashboard_rally_obras",
-                     "description": "OBRAS FEDERALES GEOLOCALIZADAS 2013–2018 (tab ④ Aterrizan). Rally ¿Cómo van las obras? — proyectos con contratista, ramo federal, monto ejercido, alcaldía y avance físico. Usa esta tool para '¿qué se construyó en X alcaldía?' o 'top contratistas'.",
-                     "input_schema": {"type": "object", "properties": {"alcaldia": {"type": "string"}, "ramo": {"type": "string", "description": "ej. 'Comunicaciones y Transportes', 'Salud', 'Educación Pública'"}, "ciclo_from": {"type": "integer"}, "ciclo_to": {"type": "integer"}, "top_n": {"type": "integer", "default": 15}}}},
+                     "description": "Obras federales 2013–2018 (Rally) por alcaldía, ramo, contratista.",
+                     "input_schema": {"type": "object", "properties": {"alcaldia": {"type": "string"}, "ramo": {"type": "string"}, "ciclo_from": {"type": "integer"}, "ciclo_to": {"type": "integer"}, "top_n": {"type": "integer", "default": 15}}}},
                     {"name": "dashboard_crosswalk_lookup",
-                     "description": "BÚSQUEDA EN EL CROSSWALK editorial. Busca un programa presupuestario específico por subcadena en source_label o display_name. Devuelve su citizen_category asignada y el rationale de por qué quedó en esa categoría.",
+                     "description": "Busca un programa en el crosswalk editorial. Devuelve su categoría ciudadana y rationale.",
                      "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
                 ]
 
                 _MCP_TOOLS = [
-                    {"name": "cdmx_finanzas_proveedores", "description": "Padrón de proveedores del gobierno CDMX (empresas que reciben contratos). Filtra por nombre_contiene.",
+                    {"name": "cdmx_finanzas_proveedores", "description": "Padrón de proveedores del gobierno CDMX.",
                      "input_schema": {"type": "object", "properties": {"nombre_contiene": {"type": "string"}}}},
-                    {"name": "cdmx_search", "description": "Búsqueda libre en el catálogo CKAN de datos.cdmx.gob.mx. Úsalo solo si la pregunta no encaja con ninguna dashboard_* — y filtra siempre a temas financieros.",
-                     "input_schema": {"type": "object", "properties": {"query": {"type": "string"}, "max_results": {"type": "integer", "default": 10}}, "required": ["query"]}},
-                    {"name": "cdmx_sql_remote", "description": "SQL read-only sobre CKAN. Tabla='\"<resource_id>\"'. Para consultas específicas sobre recursos CKAN de finanzas que no caen en otra tool.",
+                    {"name": "cdmx_search", "description": "Búsqueda libre en CKAN datos.cdmx.gob.mx (solo finanzas).",
+                     "input_schema": {"type": "object", "properties": {"query": {"type": "string"}, "max_results": {"type": "integer", "default": 5}}, "required": ["query"]}},
+                    {"name": "cdmx_sql_remote", "description": "SQL read-only sobre CKAN.",
                      "input_schema": {"type": "object", "properties": {"sql": {"type": "string"}}, "required": ["sql"]}},
                 ]
 
                 _TOOLS = _DASHBOARD_TOOLS + _MCP_TOOLS
 
                 _SYSTEM = (
-                    "Eres el asistente de 'La ruta de tu peso' — finanzas públicas de CDMX. "
-                    "ÚNICAMENTE respondes sobre presupuesto, egresos, ingresos, programas, "
-                    "contratistas, obras, categorías ciudadanas y proveedores del gobierno CDMX. "
-                    "Si te preguntan otra cosa (movilidad, seguridad, aire, clima…), contesta "
-                    "amablemente que este asistente está enfocado en finanzas públicas.\n\n"
-                    "ESTILO DE RESPUESTA — muy importante:\n"
-                    "- Responde en prosa breve, conversacional. Como si se lo explicaras a un amigo.\n"
-                    "- NUNCA uses tablas de markdown (nada de `|...|...|` ni cabeceras). Las "
-                    "visualizaciones están en las pestañas ①–⑦; tú respondes con palabras.\n"
-                    "- Menciona máximo 2 o 3 cifras por respuesta, entretejidas en el texto "
-                    "(ej. 'El Metro recibió $17.5 mmdp en 2024 — casi la mitad del gasto en "
-                    "transporte'). Usa formato compacto: $X mmdp / $X mdp / $X k.\n"
-                    "- Máximo 3–4 líneas totales. Sin listas largas. Sin emojis salvo uno al inicio si aporta.\n"
-                    "- Cierra con una referencia corta: '— fuente: budget_tree.parquet' o "
-                    "'(ver ⑥ Ciudadano)'. Una sola referencia, no dos.\n\n"
-                    "RUTEO DE HERRAMIENTAS:\n"
-                    "1. Presupuesto / egresos / ingresos / Cablebús / Pilares / Mi Beca / Altépetl / "
-                    "Rally / categorías → dashboard_* primero.\n"
-                    "2. Proveedores del gobierno → cdmx_finanzas_proveedores.\n"
-                    "3. Sólo si nada encaja y es financiero → cdmx_search / cdmx_sql_remote.\n"
-                    "4. Si una tool devuelve error o vacío, dilo — no inventes."
+                    "Asistente de finanzas públicas CDMX. Solo presupuesto, egresos, ingresos, "
+                    "programas, contratistas, obras y proveedores. Si preguntan otra cosa, declina.\n\n"
+                    "ESTILO: prosa breve y conversacional. Nunca tablas markdown. Máx 3–4 líneas. "
+                    "Máx 2–3 cifras en formato $X mmdp/mdp/k entretejidas en el texto. Cierra con "
+                    "una referencia ('— budget_tree.parquet' o 'ver ⑥ Ciudadano').\n\n"
+                    "RUTEO: presupuesto/categorías → dashboard_*; proveedores → cdmx_finanzas_proveedores; "
+                    "resto → cdmx_search / cdmx_sql_remote. Si devuelve vacío o error, dilo — no inventes."
                 )
 
                 _client = anthropic.Anthropic(api_key=_api_key)

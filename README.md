@@ -96,6 +96,63 @@ uv run marimo new notebooks/my_analysis.py
 
 ---
 
+## Deploy
+
+The primary demo target is the hackathon app `notebooks/tus_100_pesos.py`.
+Two paths are supported, with a third as emergency fallback.
+
+### Primary — Marimo Cloud
+
+Zero-infrastructure option. Connect this repo in the [Marimo Cloud](https://marimo.io/cloud)
+dashboard, pick `notebooks/tus_100_pesos.py` as the entry, deploy. Marimo handles
+HTTPS, the public URL, and restarts on push. This is the fastest path and the
+one rehearsed for the pitch.
+
+### Fallback — Fly.io
+
+Scaffolding is committed (`Dockerfile`, `fly.toml`) so a redeploy is one command:
+
+```bash
+flyctl launch --copy-config --no-deploy   # first time: claim the app name
+flyctl deploy                              # build + push the image
+flyctl open                                # opens the live URL
+```
+
+The image serves whichever notebook `MARIMO_NOTEBOOK` points at (defaults to
+`notebooks/tus_100_pesos.py` via `fly.toml`). To serve a different notebook
+in place — for example, to swap to `budget_dashboard.py` while the main app
+is being fixed:
+
+```bash
+flyctl secrets set MARIMO_NOTEBOOK=notebooks/budget_dashboard.py
+flyctl deploy
+```
+
+The Dockerfile bundles `data/clean/` (parquet contract committed to git per the
+Agent 1 ↔ Agent 2 handoff) but not `data/*.csv` — those remain reproducible
+via `scripts/download_data.sh` on a fresh machine.
+
+### Emergency fallback — Tailscale Funnel
+
+If both of the above are blocked at pitch time, expose the lead's laptop:
+
+```bash
+uv run marimo run notebooks/tus_100_pesos.py --host 0.0.0.0 --port 2718 --headless --no-token
+tailscale funnel 2718
+```
+
+The Funnel URL (`https://<host>.<tailnet>.ts.net`) works for judges without
+Tailscale auth. Document the URL in `DEMO_RUNBOOK.md` at hour 4–5.
+
+### The other notebooks
+
+`budget_dashboard.py`, `obra_map.py`, and `explore.py` remain standalone demos.
+They run locally via `uv run marimo run notebooks/<name>.py`. They are not part
+of the deployed bundle in order to keep the primary URL a single surface — if
+judges ask to see them, the lead runs them locally from the same repo.
+
+---
+
 ## Troubleshooting
 
 **`uv: command not found`** — install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS/Linux) or [see Windows instructions](https://docs.astral.sh/uv/getting-started/installation/).

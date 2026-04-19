@@ -13,6 +13,7 @@ from cdmx_data.domains.aire import Aire
 from cdmx_data.domains.servicios import Servicios
 from cdmx_data.domains.finanzas import Finanzas
 from cdmx_data.domains.geo import Geo
+from cdmx_data.domains.presupuesto import Presupuesto
 
 _LOCAL_PREFIX = "local:"
 
@@ -45,6 +46,7 @@ class CDMX:
         self.servicios = Servicios(self)
         self.finanzas = Finanzas(self)
         self.geo = Geo(self)
+        self.presupuesto = Presupuesto(self)
 
     def _load_local(self, key: str) -> pd.DataFrame | None:
         """Carga CSVs locales que coincidan con *_{key}_*.csv en data_dir."""

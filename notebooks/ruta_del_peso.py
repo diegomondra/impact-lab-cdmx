@@ -2035,10 +2035,10 @@ def _(
                 _history.append({"role": "user", "content": _question})
 
                 try:
-                    for _iter in range(8):
+                    for _iter in range(5):
                         _resp = _client.messages.create(
                             model="claude-sonnet-4-6",
-                            max_tokens=2048,
+                            max_tokens=1024,
                             system=_SYSTEM,
                             tools=_TOOLS,
                             messages=_history,
@@ -2062,9 +2062,18 @@ def _(
                                         _r = _dashboard_dispatch(_b.name, _b.input or {})
                                     else:
                                         _r = _mcp_dispatch(_cdmx, _b.name, _b.input or {})
+                                    # Cap tool-result payload at ~2500 chars so the history
+                                    # doesn't blow up the input-tokens/min rate limit.
+                                    if isinstance(_r, dict) and "records" in _r:
+                                        _recs = _r.get("records") or []
+                                        if isinstance(_recs, list) and len(_recs) > 10:
+                                            _r = dict(_r)
+                                            _r["records"] = _recs[:10]
+                                            _r["_truncated_to"] = 10
+                                            _r["_total_records"] = len(_recs)
                                     _text = _json.dumps(_r, default=str, ensure_ascii=False)
-                                    if len(_text) > 8000:
-                                        _text = _text[:8000] + "…[truncado]"
+                                    if len(_text) > 2500:
+                                        _text = _text[:2500] + "…[truncado]"
                                 except Exception as _te:
                                     _text = _json.dumps({"error": f"{type(_te).__name__}: {_te}"}, ensure_ascii=False)
                                 _results.append({"type": "tool_result", "tool_use_id": _b.id, "content": _text})
@@ -2073,7 +2082,17 @@ def _(
                     set_agent_history(_history)
                     set_agent_error(None)
                 except Exception as _e:
-                    set_agent_error(f"Error llamando a Anthropic: {type(_e).__name__}: {_e}")
+                    _name = type(_e).__name__
+                    _msg = str(_e)
+                    if "rate_limit" in _msg.lower() or _name == "RateLimitError":
+                        set_agent_error(
+                            "Límite de tokens por minuto alcanzado en la API de Anthropic. "
+                            "Espera ~60 segundos y vuelve a intentar, o haz una pregunta más corta."
+                        )
+                    elif "authentication" in _msg.lower() or "401" in _msg:
+                        set_agent_error("ANTHROPIC_API_KEY inválida — revisa el valor en .env.")
+                    else:
+                        set_agent_error(f"Error de la API: {_name}. Reintenta en un momento.")
     return
 
 
